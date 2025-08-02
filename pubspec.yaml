@@ -33,6 +33,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_local_notifications: ^19.4.0
+  percent_indicator: ^4.2.5
   permission_handler: ^12.0.1
   workmanager: ^0.9.0
 
@@ -65,9 +66,9 @@ flutter:
   fonts:
     - family: CustomFont
       fonts:
-        - asset: assets/fonts/Poppins-Bold.ttf
-        - asset: assets/fonts/Poppins-Medium.ttf
-        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+        - asset: assets/fonts/SpaceGrotesk-Regular.ttf
   #   - family: Trajan Pro
   #     fonts:
   #       - asset: fonts/TrajanPro.ttf
