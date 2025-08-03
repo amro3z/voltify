@@ -170,35 +170,45 @@ class _HomeScreenState extends State<HomeScreen> {
           SizedBox(height: MediaQuery.of(context).size.height * 0.025),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  appIsRunning = !appIsRunning;
-                });
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AlarmScreen(currentTimeZone: currentTimeZone),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.green.withOpacity(0.5),
+                    blurRadius: 8,
+                    spreadRadius: 2,
                   ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32.0,
-                  vertical: 8.0,
-                ),
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                ],
               ),
-              child: Text(
-                appIsRunning ? 'Stop' : 'Start ',
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Colors.black,
-                  fontFamily: 'CustomFont',
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    appIsRunning = !appIsRunning;
+                  });
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          AlarmScreen(currentTimeZone: currentTimeZone),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32.0,
+                    vertical: 8.0,
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+                child: Text(
+                  appIsRunning ? 'Stop' : 'Start ',
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: Colors.black,
+                    fontFamily: 'CustomFont',
+                  ),
                 ),
               ),
             ),
