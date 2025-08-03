@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
+import 'package:voltify/screens/alarm_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,15 +17,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
+  bool appIsRunning = false;
   BatteryState _batteryState = BatteryState.unknown;
 
   late StreamSubscription<BatteryState> _batteryStateSubscription;
   Timer? _batteryInfoTimer; // ← التايمر
-
+  late String currentTimeZone;
   @override
   void initState() {
     super.initState();
-
+    FlutterTimezone.getLocalTimezone().then((String timezone) {
+      setState(() {
+        currentTimeZone = timezone;
+      });
+    });
     // قراءة الحالة الحالية مرة واحدة
     _battery.batteryState.then(_updateBatteryState);
     _battery.batteryLevel.then((level) => _batteryLevel = level);
@@ -135,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
             animation: true,
             percent: _batteryLevel / 100,
             center: Text(
-              "${_batteryLevel}%",
+              "$_batteryLevel%",
               style: const TextStyle(
                 fontSize: 18,
                 color: Colors.white,
@@ -165,7 +172,16 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton(
               onPressed: () {
-                // Handle button press
+                setState(() {
+                  appIsRunning = true;
+                });
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        AlarmScreen(currentTimeZone: currentTimeZone),
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
@@ -177,8 +193,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(24),
                 ),
               ),
-              child: const Text(
-                'Start',
+              child: Text(
+                appIsRunning ? 'Stop' : 'Start ',
                 style: TextStyle(
                   fontSize: 20,
                   color: Colors.black,
