@@ -173,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ElevatedButton(
               onPressed: () {
                 setState(() {
-                  appIsRunning = true;
+                  appIsRunning = !appIsRunning;
                 });
                 Navigator.push(
                   context,
