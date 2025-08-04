@@ -1,5 +1,6 @@
 import 'package:animated_analog_clock/animated_analog_clock.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 
 class AlarmScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class AlarmScreen extends StatefulWidget {
 
 class _AlarmScreenState extends State<AlarmScreen> {
   late String currentTimeZone;
-  bool alarmClose = false;
+  late SharedPreferences data;
   final GlobalKey<SlideActionState> _key = GlobalKey<SlideActionState>();
   @override
   void initState() {
@@ -88,7 +89,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
               enabled: true,
               height: MediaQuery.of(context).size.height * 0.06,
               textColor: Colors.white,
-              innerColor: Colors.lightGreenAccent,
+              innerColor: Colors.green,
               outerColor: Colors.black,
               borderRadius: 52,
               elevation: 0,
@@ -98,7 +99,7 @@ class _AlarmScreenState extends State<AlarmScreen> {
               submittedIcon: const Icon(Icons.check),
               onSubmit: () async {
                 _key.currentState?.reset();
-                alarmClose = true;
+                Navigator.pop(context);
               },
               sliderButtonIcon: const Icon(Icons.arrow_forward),
               child: const Text(

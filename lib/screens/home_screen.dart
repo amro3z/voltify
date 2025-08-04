@@ -3,7 +3,7 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
-import 'package:voltify/screens/alarm_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,35 +14,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final Battery _battery = Battery();
+  late SharedPreferences data;
 
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
   bool appIsRunning = false;
   BatteryState _batteryState = BatteryState.unknown;
-
   late StreamSubscription<BatteryState> _batteryStateSubscription;
-  Timer? _batteryInfoTimer; // ← التايمر
+  Timer? _batteryInfoTimer;
   late String currentTimeZone;
   @override
   void initState() {
     super.initState();
+
+    SharedPreferences.getInstance().then((sp) {
+      data = sp;
+      setState(() {
+        appIsRunning = data.getBool('appIsRunning') ?? false;
+      });
+    });
+
     FlutterTimezone.getLocalTimezone().then((String timezone) {
       setState(() {
         currentTimeZone = timezone;
+        data.setString('currentTimeZone', timezone);
       });
     });
-    // قراءة الحالة الحالية مرة واحدة
+
     _battery.batteryState.then(_updateBatteryState);
     _battery.batteryLevel.then((level) => _batteryLevel = level);
     _battery.isInBatterySaveMode.then((mode) => _isInBatterySaveMode = mode);
 
-    // متابعة تغيّرات حالة الشحن
     _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
       _updateBatteryState,
     );
 
-    // التايمر كل 3 ثواني
-    _batteryInfoTimer = Timer.periodic(Duration(seconds: 3), (_) async {
+    _batteryInfoTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       final level = await _battery.batteryLevel;
       final mode = await _battery.isInBatterySaveMode;
 
@@ -59,7 +66,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_batteryState == state) return;
     setState(() {
       _batteryState = state;
+      data.setString('batteryState', state.toString());
     });
+  }
+
+  @override
+  void dispose() {
+    _batteryStateSubscription.cancel();
+    _batteryInfoTimer?.cancel();
+    super.dispose();
   }
 
   String getBatteryStateText(BatteryState state) {
@@ -77,11 +92,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _batteryStateSubscription.cancel();
-    _batteryInfoTimer?.cancel();
-    super.dispose();
+  void toggleAppRunning() async {
+    setState(() {
+      appIsRunning = !appIsRunning;
+    });
+    await data.setBool('appIsRunning', appIsRunning);
   }
 
   @override
@@ -103,33 +118,21 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Align(
-              alignment: Alignment.center,
-              child: Text(
-                getBatteryStateText(_batteryState),
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Colors.white,
-                  fontFamily: 'CustomFont',
-                ),
-              ),
+          Text(
+            getBatteryStateText(_batteryState),
+            style: const TextStyle(
+              fontSize: 18,
+              color: Colors.white,
+              fontFamily: 'CustomFont',
             ),
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Align(
-              alignment: Alignment.center,
-              child: Text(
-                "Save Mode is ${_isInBatterySaveMode ? 'Enabled' : 'Disabled'}",
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Colors.white,
-                  fontFamily: 'CustomFont',
-                ),
-              ),
+          Text(
+            "Save Mode is ${_isInBatterySaveMode ? 'Enabled' : 'Disabled'}",
+            style: const TextStyle(
+              fontSize: 18,
+              color: Colors.white,
+              fontFamily: 'CustomFont',
             ),
           ),
           SizedBox(height: MediaQuery.of(context).size.height * 0.05),
@@ -138,7 +141,6 @@ class _HomeScreenState extends State<HomeScreen> {
             lineWidth: 13.0,
             animationDuration: 2000,
             animateFromLastPercent: true,
-
             animation: true,
             percent: _batteryLevel / 100,
             center: Text(
@@ -149,11 +151,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontFamily: 'CustomFont',
               ),
             ),
-            footer: Padding(
-              padding: const EdgeInsets.only(top: 32.0),
+            footer: const Padding(
+              padding: EdgeInsets.only(top: 32.0),
               child: Text(
                 "Battery Level",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   color: Colors.white,
                   fontFamily: 'CustomFont',
@@ -167,75 +169,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Colors.orange
                 : Colors.green,
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.025),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.green,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.green.withOpacity(0.5),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    appIsRunning = !appIsRunning;
-                  });
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          AlarmScreen(currentTimeZone: currentTimeZone),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32.0,
-                    vertical: 8.0,
-                  ),
-                  backgroundColor: Colors.green,
-                ),
-                child: Text(
-                  appIsRunning ? 'Stop' : 'Start ',
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: Colors.black,
-                    fontFamily: 'CustomFont',
-                  ),
-                ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              toggleAppRunning();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            child: Text(
+              appIsRunning ? 'Stop' : 'Start',
+              style: const TextStyle(
+                fontSize: 20,
+                color: Colors.black,
+                fontFamily: 'CustomFont',
               ),
             ),
           ),
-          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
-          Text(
-            'This app monitors the battery status and notifies you ',
+          const Spacer(),
+          const Text(
+            'This app monitors the battery status and notifies you when the electricity comes back.',
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
               color: Colors.lightGreen,
               fontFamily: 'CustomFont',
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8, left: 8, bottom: 16.0),
-            child: Align(
-              alignment: Alignment.center,
-              child: Text(
-                'when the electricity comes back.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.lightGreen,
-                  fontFamily: 'CustomFont',
-                ),
-              ),
-            ),
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
