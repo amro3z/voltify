@@ -1,9 +1,15 @@
 import 'dart:async';
+import 'dart:developer';
+import 'dart:io';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voltify/screens/alarm_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,7 +21,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final Battery _battery = Battery();
   late SharedPreferences data;
-
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
   bool appIsRunning = false;
@@ -23,36 +28,79 @@ class _HomeScreenState extends State<HomeScreen> {
   late StreamSubscription<BatteryState> _batteryStateSubscription;
   Timer? _batteryInfoTimer;
   late String currentTimeZone;
+  static const platform = MethodChannel('voltify/intent');
+  bool _pendingOpenAlarm = false;
+
   @override
   void initState() {
     super.initState();
+    log('🔥 Initializing HomeScreen');
+    initApp();
+    platform.setMethodCallHandler((call) async {
+      log('🔥 MethodChannel handler called: ${call.method}');
+      if (call.method == "onNewIntent") {
+        final bool shouldOpenAlarm = call.arguments as bool;
+        log('🔥 Received onNewIntent: shouldOpenAlarm = $shouldOpenAlarm');
+        if (shouldOpenAlarm && mounted) {
+          log('🔥 Navigating to AlarmScreen from onNewIntent');
+          Navigator.of(context, rootNavigator: true).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  AlarmScreen(currentTimeZone: currentTimeZone),
+            ),
+          );
+        } else {
+          log(
+            '🔥 Not navigating: shouldOpenAlarm = $shouldOpenAlarm, mounted = $mounted',
+          );
+          if (shouldOpenAlarm) {
+            _pendingOpenAlarm = true; // Store pending intent if not mounted
+          }
+        }
+      }
+      return null;
+    });
+    // Check initial intent
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkIntentAndOpenAlarm(context);
+    });
+  }
 
-    SharedPreferences.getInstance().then((sp) {
-      data = sp;
-      setState(() {
-        appIsRunning = data.getBool('appIsRunning') ?? false;
-      });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_pendingOpenAlarm && mounted) {
+      log(
+        '🔥 Navigating to AlarmScreen from pending intent in didChangeDependencies',
+      );
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (context) => AlarmScreen(currentTimeZone: currentTimeZone),
+        ),
+      );
+      _pendingOpenAlarm = false;
+    }
+  }
+
+  Future<void> initApp() async {
+    data = await SharedPreferences.getInstance();
+    setState(() {
+      appIsRunning = data.getBool('appIsRunning') ?? false;
     });
 
-    FlutterTimezone.getLocalTimezone().then((String timezone) {
-      setState(() {
-        currentTimeZone = timezone;
-        data.setString('currentTimeZone', timezone);
-      });
-    });
-
-    _battery.batteryState.then(_updateBatteryState);
-    _battery.batteryLevel.then((level) => _batteryLevel = level);
-    _battery.isInBatterySaveMode.then((mode) => _isInBatterySaveMode = mode);
+    currentTimeZone = await FlutterTimezone.getLocalTimezone();
+    await data.setString('currentTimeZone', currentTimeZone);
 
     _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
       _updateBatteryState,
     );
+    _batteryLevel = await _battery.batteryLevel;
+    _isInBatterySaveMode = await _battery.isInBatterySaveMode;
+    _battery.batteryState.then(_updateBatteryState);
 
-    _batteryInfoTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+    _batteryInfoTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       final level = await _battery.batteryLevel;
       final mode = await _battery.isInBatterySaveMode;
-
       if (level != _batteryLevel || mode != _isInBatterySaveMode) {
         setState(() {
           _batteryLevel = level;
@@ -60,6 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+
+    setState(() {});
   }
 
   void _updateBatteryState(BatteryState state) {
@@ -92,11 +142,53 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> writeStateFile(Map<String, String> params) async {
+    final file = File(params['path']!);
+    await file.writeAsString(params['value']!);
+  }
+
   void toggleAppRunning() async {
     setState(() {
       appIsRunning = !appIsRunning;
     });
     await data.setBool('appIsRunning', appIsRunning);
+    final dir = await getApplicationDocumentsDirectory();
+    final path = '${dir.path}/state.txt';
+    try {
+      await compute(writeStateFile, {
+        'path': path,
+        'value': appIsRunning ? '1' : '0',
+      });
+      log('[FILE] Saved appIsRunning = ${appIsRunning ? '1' : '0'}');
+      log('[FILE] File path = $path');
+      log('[FILE] File exists: ${await File(path).exists()}');
+    } catch (e) {
+      log('[FILE] ❌ Error saving appIsRunning: $e');
+    }
+  }
+
+  Future<void> checkIntentAndOpenAlarm(BuildContext context) async {
+    try {
+      final bool shouldOpenAlarm = await platform.invokeMethod('checkIntent');
+      log('🔥 Checking intent: shouldOpenAlarm = $shouldOpenAlarm');
+      if (shouldOpenAlarm && mounted) {
+        log('🔥 Navigating to AlarmScreen from checkIntent');
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (context) => AlarmScreen(currentTimeZone: currentTimeZone),
+          ),
+        );
+      } else {
+        log(
+          '🔥 Not navigating: shouldOpenAlarm = $shouldOpenAlarm, mounted = $mounted',
+        );
+        if (shouldOpenAlarm) {
+          _pendingOpenAlarm = true; // Store pending intent if not mounted
+        }
+      }
+    } catch (e) {
+      log('❌ Error checking intent: $e');
+    }
   }
 
   @override
