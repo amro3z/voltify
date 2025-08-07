@@ -1,4 +1,3 @@
-// ✅ PowerReceiver.java (مُعدّل)
 package com.example.voltify;
 
 import android.app.NotificationChannel;
@@ -41,7 +40,10 @@ public class PowerReceiver extends BroadcastReceiver {
                 launch.setAction(Intent.ACTION_MAIN);
                 launch.addCategory(Intent.CATEGORY_LAUNCHER);
                 launch.putExtra("openAlarm", true);
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                        Intent.FLAG_ACTIVITY_NO_ANIMATION |
+                        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
 
                 NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -49,6 +51,8 @@ public class PowerReceiver extends BroadcastReceiver {
                             NOTIFICATION_CHANNEL_ID,
                             "Voltify Notifications",
                             NotificationManager.IMPORTANCE_HIGH);
+                    channel.enableVibration(true);
+                    channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
                     notificationManager.createNotificationChannel(channel);
                 }
 
@@ -66,7 +70,8 @@ public class PowerReceiver extends BroadcastReceiver {
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
                         .setAutoCancel(true)
                         .setFullScreenIntent(pendingIntent, true)
-                        .setContentIntent(pendingIntent);
+                        .setContentIntent(pendingIntent)
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
                 notificationManager.notify(1, builder.build());
                 context.startActivity(launch);

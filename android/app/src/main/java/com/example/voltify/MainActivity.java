@@ -22,6 +22,7 @@ public class MainActivity extends FlutterActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // إعدادات لعرض الشاشة حتى لو الجهاز مقفول
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true);
             setTurnScreenOn(true);
@@ -31,6 +32,13 @@ public class MainActivity extends FlutterActivity {
                     WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
                     WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         }
+
+        // إضافة فلاج للسماح بعرض الـ Activity فوق التطبيقات
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+                WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD);
+
+        // التحقق من الإنتينت عند بدء الـ Activity
+        checkIntent(getIntent());
     }
 
     @Override
@@ -54,6 +62,10 @@ public class MainActivity extends FlutterActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        checkIntent(intent);
+    }
+
+    private void checkIntent(Intent intent) {
         boolean shouldOpen = intent.getBooleanExtra("openAlarm", false);
         Log.d("MainActivity", "🔔 New intent received, openAlarm: " + shouldOpen);
         if (methodChannel != null) {
