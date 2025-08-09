@@ -1,15 +1,12 @@
 import 'dart:async';
-import 'dart:developer';
-import 'dart:io';
 import 'package:battery_plus/battery_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:voltify/screens/alarm_screen.dart';
+import 'package:voltify/notification/local_service.dart';
+import 'package:voltify/background%20service/work_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final Battery _battery = Battery();
   late SharedPreferences data;
+
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
   bool appIsRunning = false;
@@ -28,88 +26,57 @@ class _HomeScreenState extends State<HomeScreen> {
   late StreamSubscription<BatteryState> _batteryStateSubscription;
   Timer? _batteryInfoTimer;
   late String currentTimeZone;
-  static const platform = MethodChannel('voltify/intent');
-  bool _pendingOpenAlarm = false;
-
   @override
   void initState() {
     super.initState();
-    log('🔥 Initializing HomeScreen');
-    initApp();
-    platform.setMethodCallHandler((call) async {
-      log('🔥 MethodChannel handler called: ${call.method}');
-      if (call.method == "onNewIntent") {
-        final bool shouldOpenAlarm = call.arguments as bool;
-        log('🔥 Received onNewIntent: shouldOpenAlarm = $shouldOpenAlarm');
-        if (shouldOpenAlarm && mounted) {
-          log('🔥 Navigating to AlarmScreen from onNewIntent');
-          Navigator.of(context, rootNavigator: true).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  AlarmScreen(currentTimeZone: currentTimeZone),
-            ),
+
+    // ننتظر تهيئة SharedPreferences
+    SharedPreferences.getInstance()
+        .then((sp) {
+          data = sp;
+          setState(() {
+            appIsRunning = data.getBool('appIsRunning') ?? false;
+          });
+
+          // نحدث الـ TimeZone بعد تهيئة data
+          FlutterTimezone.getLocalTimezone().then((String timezone) {
+            setState(() {
+              currentTimeZone = timezone;
+              data.setString('currentTimeZone', timezone);
+            });
+          });
+
+          // نحدث حالة البطارية بعد تهيئة data
+          _battery.batteryState.then(_updateBatteryState);
+          _battery.batteryLevel.then(
+            (level) => setState(() => _batteryLevel = level),
           );
-        } else {
-          log(
-            '🔥 Not navigating: shouldOpenAlarm = $shouldOpenAlarm, mounted = $mounted',
+          _battery.isInBatterySaveMode.then(
+            (mode) => setState(() => _isInBatterySaveMode = mode),
           );
-          if (shouldOpenAlarm) {
-            _pendingOpenAlarm = true; // Store pending intent if not mounted
-          }
-        }
-      }
-      return null;
-    });
-    // Check initial intent
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      checkIntentAndOpenAlarm(context);
-    });
-  }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_pendingOpenAlarm && mounted) {
-      log(
-        '🔥 Navigating to AlarmScreen from pending intent in didChangeDependencies',
-      );
-      Navigator.of(context, rootNavigator: true).push(
-        MaterialPageRoute(
-          builder: (context) => AlarmScreen(currentTimeZone: currentTimeZone),
-        ),
-      );
-      _pendingOpenAlarm = false;
-    }
-  }
+          _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
+            _updateBatteryState,
+          );
 
-  Future<void> initApp() async {
-    data = await SharedPreferences.getInstance();
-    setState(() {
-      appIsRunning = data.getBool('appIsRunning') ?? false;
-    });
-
-    currentTimeZone = await FlutterTimezone.getLocalTimezone();
-    await data.setString('currentTimeZone', currentTimeZone);
-
-    _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
-      _updateBatteryState,
-    );
-    _batteryLevel = await _battery.batteryLevel;
-    _isInBatterySaveMode = await _battery.isInBatterySaveMode;
-    _battery.batteryState.then(_updateBatteryState);
-
-    _batteryInfoTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      final level = await _battery.batteryLevel;
-      final mode = await _battery.isInBatterySaveMode;
-      if (level != _batteryLevel || mode != _isInBatterySaveMode) {
-        setState(() {
-          _batteryLevel = level;
-          _isInBatterySaveMode = mode;
+          _batteryInfoTimer = Timer.periodic(const Duration(seconds: 5), (
+            _,
+          ) async {
+            // زيادة المدة
+            if (!mounted) return; // لو الـ Widget مات، يرجع
+            final level = await _battery.batteryLevel;
+            final mode = await _battery.isInBatterySaveMode;
+            if (mounted) {
+              setState(() {
+                _batteryLevel = level;
+                _isInBatterySaveMode = mode;
+              });
+            }
+          });
+        })
+        .catchError((e) {
+          print("Error initializing SharedPreferences: $e");
         });
-      }
-    });
-
-    setState(() {});
   }
 
   void _updateBatteryState(BatteryState state) {
@@ -118,6 +85,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _batteryState = state;
       data.setString('batteryState', state.toString());
     });
+
+    // Trigger work manager to check charging status when battery state changes
+    WorkManagerHandler.triggerChargingCheck();
   }
 
   @override
@@ -142,53 +112,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> writeStateFile(Map<String, String> params) async {
-    final file = File(params['path']!);
-    await file.writeAsString(params['value']!);
-  }
-
   void toggleAppRunning() async {
     setState(() {
       appIsRunning = !appIsRunning;
     });
     await data.setBool('appIsRunning', appIsRunning);
-    final dir = await getApplicationDocumentsDirectory();
-    final path = '${dir.path}/state.txt';
-    try {
-      await compute(writeStateFile, {
-        'path': path,
-        'value': appIsRunning ? '1' : '0',
-      });
-      log('[FILE] Saved appIsRunning = ${appIsRunning ? '1' : '0'}');
-      log('[FILE] File path = $path');
-      log('[FILE] File exists: ${await File(path).exists()}');
-    } catch (e) {
-      log('[FILE] ❌ Error saving appIsRunning: $e');
-    }
-  }
 
-  Future<void> checkIntentAndOpenAlarm(BuildContext context) async {
-    try {
-      final bool shouldOpenAlarm = await platform.invokeMethod('checkIntent');
-      log('🔥 Checking intent: shouldOpenAlarm = $shouldOpenAlarm');
-      if (shouldOpenAlarm && mounted) {
-        log('🔥 Navigating to AlarmScreen from checkIntent');
-        Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(
-            builder: (context) => AlarmScreen(currentTimeZone: currentTimeZone),
-          ),
-        );
-      } else {
-        log(
-          '🔥 Not navigating: shouldOpenAlarm = $shouldOpenAlarm, mounted = $mounted',
-        );
-        if (shouldOpenAlarm) {
-          _pendingOpenAlarm = true; // Store pending intent if not mounted
-        }
-      }
-    } catch (e) {
-      log('❌ Error checking intent: $e');
-    }
+    // Update work manager app running status
+    WorkManagerHandler.setAppRunning(appIsRunning);
+
+    // Trigger work manager to check charging status immediately
+    await WorkManagerHandler.triggerChargingCheck();
   }
 
   @override
@@ -275,6 +209,34 @@ class _HomeScreenState extends State<HomeScreen> {
               style: const TextStyle(
                 fontSize: 20,
                 color: Colors.black,
+                fontFamily: 'CustomFont',
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () async {
+              // Test overlay manually
+              if (await FlutterOverlayWindow.isPermissionGranted()) {
+                await FlutterOverlayWindow.showOverlay(
+                  height: 400,
+                  overlayTitle: "Voltify Alarm",
+                  overlayContent: "Test Overlay",
+                  flag: OverlayFlag.focusPointer,
+                );
+              } else {
+                print("❌ Overlay permission not granted");
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            child: Text(
+              "Test Overlay",
+              style: const TextStyle(
+                fontSize: 20,
+                color: Colors.white,
                 fontFamily: 'CustomFont',
               ),
             ),
