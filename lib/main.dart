@@ -7,11 +7,14 @@ import 'package:voltify/screens/home_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:voltify/widget/alarm_widget.dart';
 import 'package:battery_plus/battery_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Future.wait([WorkManagerHandler.init(), LocalService.initNotification()]);
+  // Initialize WorkManager and LocalService before running the app
+  await Future.wait([
+    WorkManagerHandler.init(),
+    LocalService.initNotification(),
+  ]);
   tz.initializeTimeZones();
   // طلب الأذونات
   if (await FlutterOverlayWindow.isPermissionGranted() == false) {
@@ -72,20 +75,11 @@ class _InitState extends State<Init> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-
-    switch (state) {
-      case AppLifecycleState.resumed:
-        WorkManagerHandler.setAppRunning(true);
-        break;
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.hidden:
-        WorkManagerHandler.setAppRunning(false);
-        break;
-      case AppLifecycleState.inactive:
-        // Keep app running status as is
-        break;
+    // We no longer toggle appRunning on pause/detach so overlay persists
+    if (state == AppLifecycleState.resumed) {
+      WorkManagerHandler.setAppRunning(true);
     }
+    // Stop the app only via explicit Stop button
   }
 
   @override
@@ -98,7 +92,6 @@ class _InitState extends State<Init> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Voltify',
       theme: ThemeData.dark(),
       home: const HomeScreen(),
     );

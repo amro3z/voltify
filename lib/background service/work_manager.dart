@@ -8,6 +8,8 @@ class WorkManagerHandler {
   static final Workmanager _instance = Workmanager();
   static final Battery _battery = Battery();
   static bool _isAppRunning = false;
+  static bool _isOverlayShowing = false; // Track overlay state
+  static BatteryState? _previousBatteryState; // Track previous battery state
 
   static void setAppRunning(bool isRunning) {
     _isAppRunning = isRunning;
@@ -47,49 +49,63 @@ class WorkManagerHandler {
 
       log("📱 App running status: $appIsRunning");
 
-      if (!appIsRunning) {
-        log("📱 App is not running, skipping overlay");
-        await FlutterOverlayWindow.closeOverlay();
-        return;
-      }
-
       // Check battery charging status
       final batteryStatus = await _battery.batteryState;
       log("🔋 Battery status: $batteryStatus");
 
-      if (batteryStatus == BatteryState.charging ||
-          batteryStatus == BatteryState.full) {
-        log("⚡ Device is charging, showing overlay");
+      final isCharging =
+          batteryStatus == BatteryState.charging ||
+          batteryStatus == BatteryState.full;
 
-        // Check if overlay permission is granted
+      if (!appIsRunning || !isCharging) {
+        // Hide overlay if app not running or not charging
+        if (_isOverlayShowing) {
+          try {
+            await FlutterOverlayWindow.closeOverlay();
+            _isOverlayShowing = false;
+            log("✅ Overlay closed (not charging or app not running)");
+          } catch (e) {
+            log("❌ Error closing overlay: $e");
+            _isOverlayShowing = false;
+          }
+        }
+        return;
+      }
+
+      // If charging and app is running, ensure overlay is showing
+      if (!_isOverlayShowing) {
         if (await FlutterOverlayWindow.isPermissionGranted()) {
-          // Show the overlay
-          await FlutterOverlayWindow.showOverlay(
-            enableDrag: true,
-            overlayTitle: "Voltify Alarm",
-            overlayContent: "Charging Alarm Active",
-            flag: OverlayFlag.defaultFlag,
-            alignment: OverlayAlignment.center,
-            visibility: NotificationVisibility.visibilityPublic,
-            positionGravity: PositionGravity.auto,
-          );
-          log("🎉 Overlay shown successfully from background service");
+          try {
+            await FlutterOverlayWindow.showOverlay(
+              // Specify fixed overlay height
+              height: 400,
+              enableDrag: false,
+              overlayTitle: "Voltify Alarm",
+              overlayContent:
+                  "Charging Alarm Active", // Use your custom overlay entrypoint
+            );
+            _isOverlayShowing = true;
+            log("🎉 Overlay shown successfully (charging and app running)");
+          } catch (e) {
+            log("❌ Error showing overlay: $e");
+            _isOverlayShowing = false;
+          }
         } else {
           log("❌ Overlay permission not granted");
         }
       } else {
-        log("🔌 Device is not charging, hiding overlay");
-        // Hide overlay if it's showing
-        await FlutterOverlayWindow.closeOverlay();
+        log("📱 Overlay already showing (charging and app running)");
       }
     } catch (e) {
       log("❌ Error checking charging status: $e");
+      _isOverlayShowing = false;
     }
   }
 
   static Future<void> init() async {
     log("⚙️ Starting Workmanager initialization");
-    await _instance.initialize(callbackDispatcher);
+    // Initialize WorkManager; enable debug mode for testing
+    await _instance.initialize(callbackDispatcher, isInDebugMode: true);
     log("✅ Workmanager initialized successfully");
 
     // Register charging monitoring task
@@ -104,8 +120,8 @@ class WorkManagerHandler {
       "check_charging_status",
       "Charging Status Monitor",
       frequency: Duration(
-        seconds: 30,
-      ), // Check every 30 seconds for better responsiveness
+        seconds: 15, // Check more frequently for better responsiveness
+      ),
     );
 
     log("📌 Charging monitor task registered successfully");
@@ -115,6 +131,20 @@ class WorkManagerHandler {
   static Future<void> triggerChargingCheck() async {
     log("🔌 Manual trigger - checking charging status");
     await _checkChargingAndShowOverlay();
+  }
+
+  // Method to manually close overlay
+  static Future<void> closeOverlay() async {
+    if (_isOverlayShowing) {
+      try {
+        await FlutterOverlayWindow.closeOverlay();
+        _isOverlayShowing = false;
+        log("✅ Overlay closed manually");
+      } catch (e) {
+        log("❌ Error closing overlay manually: $e");
+        _isOverlayShowing = false;
+      }
+    }
   }
 
   static Future<void> registerTaskNow({

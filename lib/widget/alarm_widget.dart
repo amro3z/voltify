@@ -2,6 +2,7 @@ import 'package:animated_analog_clock/animated_analog_clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:voltify/background%20service/work_manager.dart';
 
 class AlarmWidget extends StatefulWidget {
   const AlarmWidget({super.key});
@@ -28,27 +29,45 @@ class _AlarmWidgetState extends State<AlarmWidget> {
   }
 
   Future<void> _startAlarm() async {
-    await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
 
-    // إعدادات لتشغيل الصوت كـ Alarm
-    final ctx = AudioContext(
-      android: AudioContextAndroid(
-        isSpeakerphoneOn: true,
-        contentType: AndroidContentType.music,
-        usageType: AndroidUsageType.alarm, // مهم جدًا
-        audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-      ),
-    );
+      // إعدادات لتشغيل الصوت كـ Alarm
+      final ctx = AudioContext(
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.alarm, // مهم جدًا
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+        ),
+      );
 
-    await _audioPlayer.setAudioContext(ctx);
+      await _audioPlayer.setAudioContext(ctx);
 
-    await _audioPlayer.play(
-      AssetSource("sounds/sound.wav"), // تأكد من المسار في pubspec.yaml
-    );
+      await _audioPlayer.play(
+        AssetSource("sounds/sound.wav"), // تأكد من المسار في pubspec.yaml
+      );
+    } catch (e) {
+      print("❌ Error starting alarm: $e");
+    }
   }
 
   Future<void> _stopAlarm() async {
-    await _audioPlayer.stop();
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      print("❌ Error stopping alarm: $e");
+    }
+  }
+
+  Future<void> _closeOverlay() async {
+    try {
+      await _stopAlarm();
+      await WorkManagerHandler.closeOverlay(); // Notify work manager
+      await FlutterOverlayWindow.closeOverlay();
+    } catch (e) {
+      print("❌ Error closing overlay: $e");
+    }
   }
 
   @override
@@ -63,6 +82,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
+        height: 400,
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(20)),
           gradient: RadialGradient(
@@ -74,7 +94,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
         child: Row(
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 8.0),
+              padding: const EdgeInsets.only(left: 6.0),
               child: AnimatedAnalogClock(
                 location: "Africa/Cairo",
                 hourHandColor: Colors.white,
@@ -96,14 +116,14 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                 ),
               ),
             ),
-            SizedBox(width: MediaQuery.of(context).size.width * 0.08),
+            SizedBox(width: MediaQuery.of(context).size.width * 0.04),
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 Text(
                   "Wake Up!",
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     color: Colors.white,
                     fontFamily: 'CustomFont',
                   ),
@@ -118,7 +138,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                 ),
               ],
             ),
-            SizedBox(width: MediaQuery.of(context).size.width * 0.15),
+            SizedBox(width: MediaQuery.of(context).size.width * 0.09),
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
@@ -131,10 +151,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                 ],
               ),
               child: IconButton(
-                onPressed: () async {
-                  await _stopAlarm();
-                  await FlutterOverlayWindow.closeOverlay();
-                },
+                onPressed: _closeOverlay,
                 icon: const Icon(Icons.cancel, color: Colors.white, size: 30),
               ),
             ),

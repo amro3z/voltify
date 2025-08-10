@@ -5,7 +5,6 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:voltify/notification/local_service.dart';
 import 'package:voltify/background%20service/work_manager.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -86,8 +85,19 @@ class _HomeScreenState extends State<HomeScreen> {
       data.setString('batteryState', state.toString());
     });
 
-    // Trigger work manager to check charging status when battery state changes
-    WorkManagerHandler.triggerChargingCheck();
+    final appRunning = data.getBool('appIsRunning') ?? false;
+    final isCharging =
+        state == BatteryState.charging || state == BatteryState.full;
+    if (appRunning && isCharging) {
+      FlutterOverlayWindow.showOverlay(
+        height: 400,
+        overlayTitle: 'Voltify Alarm',
+        overlayContent: 'Charging Alarm Active',
+        flag: OverlayFlag.defaultFlag,
+      );
+    } else {
+      FlutterOverlayWindow.closeOverlay();
+    }
   }
 
   @override
@@ -129,16 +139,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true,
-        title: const Text(
-          'Voltify',
+        title: const Text('Voltify',
           style: TextStyle(
             fontSize: 24,
+            fontWeight: FontWeight.bold,
             color: Colors.white,
-            fontWeight: FontWeight.w600,
             fontFamily: 'CustomFont',
           ),
         ),
+        centerTitle: true,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -209,34 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
               style: const TextStyle(
                 fontSize: 20,
                 color: Colors.black,
-                fontFamily: 'CustomFont',
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () async {
-              // Test overlay manually
-              if (await FlutterOverlayWindow.isPermissionGranted()) {
-                await FlutterOverlayWindow.showOverlay(
-                  height: 400,
-                  overlayTitle: "Voltify Alarm",
-                  overlayContent: "Test Overlay",
-                  flag: OverlayFlag.focusPointer,
-                );
-              } else {
-                print("❌ Overlay permission not granted");
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-            ),
-            child: Text(
-              "Test Overlay",
-              style: const TextStyle(
-                fontSize: 20,
-                color: Colors.white,
                 fontFamily: 'CustomFont',
               ),
             ),
