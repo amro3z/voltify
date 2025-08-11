@@ -49,6 +49,18 @@
                 <category android:name="android.intent.category.DEFAULT"/>
             </intent-filter>
         </activity>
+        
+        <!-- Register the broadcast receiver for power events -->
+        <receiver 
+            android:name=".PowerConnectionReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
+        
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>

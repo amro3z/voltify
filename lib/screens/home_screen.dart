@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,19 +84,12 @@ class _HomeScreenState extends State<HomeScreen> {
       data.setString('batteryState', state.toString());
     });
 
-    final appRunning = data.getBool('appIsRunning') ?? false;
-    final isCharging =
-        state == BatteryState.charging || state == BatteryState.full;
-    if (appRunning && isCharging) {
-      FlutterOverlayWindow.showOverlay(
-        height: 400,
-        overlayTitle: 'Voltify Alarm',
-        overlayContent: 'Charging Alarm Active',
-        flag: OverlayFlag.defaultFlag,
-      );
-    } else {
-      FlutterOverlayWindow.closeOverlay();
-    }
+    // Note: Overlay control is now handled by PowerConnectionReceiver
+    // for better background support. This prevents conflicts between
+    // Flutter battery listener and native broadcast receiver.
+
+    // Just update the UI state, don't control overlay here
+    // The PowerConnectionReceiver will handle overlay show/hide
   }
 
   @override
@@ -139,7 +131,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Voltify',
+        title: const Text(
+          'Voltify',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,

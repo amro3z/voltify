@@ -77,9 +77,8 @@ class WorkManagerHandler {
         if (await FlutterOverlayWindow.isPermissionGranted()) {
           try {
             await FlutterOverlayWindow.showOverlay(
-              // Specify fixed overlay height
               height: 400,
-              enableDrag: false,
+              enableDrag: true,
               overlayTitle: "Voltify Alarm",
               overlayContent:
                   "Charging Alarm Active", // Use your custom overlay entrypoint
