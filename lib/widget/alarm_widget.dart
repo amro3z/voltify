@@ -1,7 +1,7 @@
 import 'package:animated_analog_clock/animated_analog_clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:audioplayers/audioplayers.dart';
+// import 'package:audioplayers/audioplayers.dart';
 import 'package:voltify/background%20service/work_manager.dart';
 
 class AlarmWidget extends StatefulWidget {
@@ -12,13 +12,9 @@ class AlarmWidget extends StatefulWidget {
 }
 
 class _AlarmWidgetState extends State<AlarmWidget> {
-  late AudioPlayer _audioPlayer;
-
   @override
   void initState() {
     super.initState();
-    _audioPlayer = AudioPlayer();
-    _startAlarm();
 
     // Add a small delay to ensure the overlay is properly displayed
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -28,41 +24,8 @@ class _AlarmWidgetState extends State<AlarmWidget> {
     });
   }
 
-  Future<void> _startAlarm() async {
-    try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-
-      // إعدادات لتشغيل الصوت كـ Alarm
-      final ctx = AudioContext(
-        android: AudioContextAndroid(
-          isSpeakerphoneOn: true,
-          contentType: AndroidContentType.music,
-          usageType: AndroidUsageType.alarm, // مهم جدًا
-          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-        ),
-      );
-
-      await _audioPlayer.setAudioContext(ctx);
-
-      await _audioPlayer.play(
-        AssetSource("sounds/sound.wav"), // تأكد من المسار في pubspec.yaml
-      );
-    } catch (e) {
-      print("❌ Error starting alarm: $e");
-    }
-  }
-
-  Future<void> _stopAlarm() async {
-    try {
-      await _audioPlayer.stop();
-    } catch (e) {
-      print("❌ Error stopping alarm: $e");
-    }
-  }
-
   Future<void> _closeOverlay() async {
     try {
-      await _stopAlarm();
       await WorkManagerHandler.closeOverlay(); // Notify work manager
       await FlutterOverlayWindow.closeOverlay();
     } catch (e) {
@@ -72,8 +35,6 @@ class _AlarmWidgetState extends State<AlarmWidget> {
 
   @override
   void dispose() {
-    _stopAlarm();
-    _audioPlayer.dispose();
     super.dispose();
   }
 
