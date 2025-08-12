@@ -11,29 +11,8 @@ class AlarmWidget extends StatefulWidget {
 }
 
 class _AlarmWidgetState extends State<AlarmWidget> {
-  Offset _position = Offset.zero;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_position == Offset.zero) {
-      final screenSize = MediaQuery.of(context).size;
-      const widgetHeight = 250.0;
-      final widgetWidth = screenSize.width * 0.9;
-
-      // For overlay windows, use a fixed offset from top to avoid status bar
-      // Typical status bar height is around 24-48dp, so we'll use 60 to be safe
-      const statusBarOffset = 60.0;
-
-      _position = Offset(
-        (screenSize.width - widgetWidth) / 2, // Center horizontally
-        statusBarOffset +
-            (screenSize.height - statusBarOffset - widgetHeight) /
-                2, // Center vertically below status bar
-      );
-    }
-  }
+  Offset _position = const Offset(15, 400);
+  double _widgetHeight = 200.0; // يمكنك تغييره هنا حسب الحاجة
 
   Future<void> _closeOverlay() async {
     try {
@@ -44,8 +23,25 @@ class _AlarmWidgetState extends State<AlarmWidget> {
     }
   }
 
+  Widget card() {
+    return Container(
+      height: _widgetHeight, // استخدام الارتفاع المتغير
+      width: MediaQuery.of(context).size.width,
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.all(Radius.circular(20)),
+        gradient: RadialGradient(
+          colors: [Colors.black, Colors.yellow[200]!],
+          center: Alignment.center,
+          radius: 2,
+        ),
+      ),
+      child: _buildAlarmContent(context),
+    );
+  }
+
   Widget _buildAlarmContent(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 6.0),
@@ -115,84 +111,36 @@ class _AlarmWidgetState extends State<AlarmWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final widgetWidth = screenSize.width * 0.9;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned(
             top: _position.dy,
-            child: Draggable(
-              feedback: Material(
-                color: Colors.transparent,
-                child: Container(
-                  height: 250,
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.all(Radius.circular(20)),
-                    gradient: RadialGradient(
-                      colors: [Colors.black, Colors.lightGreenAccent[200]!],
-                      center: Alignment.center,
-                      radius: 2,
-                    ),
-                  ),
-                  child: _buildAlarmContent(context),
-                ),
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.5,
-                child: Container(
-                  height: 250,
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.all(Radius.circular(20)),
-                    gradient: RadialGradient(
-                      colors: [Colors.black, Colors.lightGreenAccent[200]!],
-                      center: Alignment.center,
-                      radius: 2,
-                    ),
-                  ),
-                  child: _buildAlarmContent(context),
-                ),
-              ),
-              onDragEnd: (details) {
-                setState(() {
-                  // Ensure the widget stays within screen bounds
-                  final screenSize = MediaQuery.of(context).size;
-                  const widgetHeight = 250.0;
-                  final widgetWidth = screenSize.width * 0.9;
+            left: _position.dx,
+            child: SizedBox(
+              width: widgetWidth,
+              height: _widgetHeight, // ارتفاع ديناميكي
+              child: Draggable(
+                feedback: Material(color: Colors.transparent, child: card()),
+                childWhenDragging: Opacity(opacity: 0.5, child: card()),
+                onDragEnd: (details) {
+                  setState(() {
+                    double newX = details.offset.dx;
+                    double newY = details.offset.dy;
 
-                  // Use fixed offsets for overlay windows
-                  const statusBarOffset = 20.0;
-                  const navBarOffset =
-                      20.0; // Space for navigation bar at bottom
+                    // قيود لمنع الخروج عن الشاشة مع الأخذ بالحسا
+                    newX = newX.clamp(0.0, screenSize.width - widgetWidth);
+                    newY = newY.clamp(0.0, screenSize.height - _widgetHeight);
 
-                  double newX = details.offset.dx;
-                  double newY = details.offset.dy;
-
-                  // Constrain X position
-                  newX = newX.clamp(0.0, screenSize.width - widgetWidth);
-
-                  // Constrain Y position with fixed offsets
-                  newY = newY.clamp(
-                    statusBarOffset,
-                    screenSize.height - widgetHeight - navBarOffset,
-                  );
-
-                  _position = Offset(newX, newY);
-                });
-              },
-              child: Container(
-                height: 250,
-                width: MediaQuery.of(context).size.width * 0.9,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(20)),
-                  gradient: RadialGradient(
-                    colors: [Colors.black, Colors.lightGreenAccent[200]!],
-                    center: Alignment.center,
-                    radius: 2,
-                  ),
-                ),
-                child: _buildAlarmContent(context),
+                    _position = Offset(newX, newY);
+                  });
+                },
+                child: card(),
               ),
             ),
           ),
