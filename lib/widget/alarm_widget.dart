@@ -1,7 +1,7 @@
 import 'package:animated_analog_clock/animated_analog_clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:voltify/background%20service/work_manager.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class AlarmWidget extends StatefulWidget {
   const AlarmWidget({super.key});
@@ -11,26 +11,45 @@ class AlarmWidget extends StatefulWidget {
 }
 
 class _AlarmWidgetState extends State<AlarmWidget> {
+  String? _timezone;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveTimezone();
+  }
+
+  Future<void> _resolveTimezone() async {
+    try {
+      final String tzName = await FlutterTimezone.getLocalTimezone();
+      if (mounted) {
+        setState(() => _timezone = tzName);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Failed to get timezone, fallback UTC: $e');
+      if (mounted) setState(() => _timezone = 'Africa/Cairo');
+    }
+  }
+
   Offset _position = const Offset(15, 400);
-  double _widgetHeight = 200.0; // يمكنك تغييره هنا حسب الحاجة
+  final double _widgetHeight = 200.0;
 
   Future<void> _closeOverlay() async {
     try {
-      await WorkManagerHandler.closeOverlay();
       await FlutterOverlayWindow.closeOverlay();
     } catch (e) {
-      print("❌ Error closing overlay: $e");
+      debugPrint("❌ Error closing overlay: $e");
     }
   }
 
   Widget card() {
     return Container(
-      height: _widgetHeight, // استخدام الارتفاع المتغير
+      height: _widgetHeight,
       width: MediaQuery.of(context).size.width,
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.all(Radius.circular(20)),
         gradient: RadialGradient(
-          colors: [Colors.black, Colors.yellow[200]!],
+          colors: [Colors.black, Colors.lightGreenAccent],
           center: Alignment.center,
           radius: 2,
         ),
@@ -46,7 +65,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
         Padding(
           padding: const EdgeInsets.only(left: 6.0),
           child: AnimatedAnalogClock(
-            location: "Africa/Cairo",
+            location: _timezone ,
             hourHandColor: Colors.white,
             minuteHandColor: Colors.white,
             secondHandColor: Colors.lightGreen,
@@ -124,7 +143,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
             left: _position.dx,
             child: SizedBox(
               width: widgetWidth,
-              height: _widgetHeight, // ارتفاع ديناميكي
+              height: _widgetHeight,
               child: Draggable(
                 feedback: Material(color: Colors.transparent, child: card()),
                 childWhenDragging: Opacity(opacity: 0.5, child: card()),
@@ -132,8 +151,6 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                   setState(() {
                     double newX = details.offset.dx;
                     double newY = details.offset.dy;
-
-                    // قيود لمنع الخروج عن الشاشة مع الأخذ بالحسا
                     newX = newX.clamp(0.0, screenSize.width - widgetWidth);
                     newY = newY.clamp(0.0, screenSize.height - _widgetHeight);
 
@@ -144,6 +161,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
               ),
             ),
           ),
+          // Test button to trigger notification manually
         ],
       ),
     );

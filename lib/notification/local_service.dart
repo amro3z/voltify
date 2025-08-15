@@ -1,87 +1,103 @@
 import 'dart:async';
-import 'dart:developer' show log;
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class LocalService {
-  static FlutterLocalNotificationsPlugin flutterLocalNotification =
-      FlutterLocalNotificationsPlugin();
-  static StreamController<NotificationResponse> notificationStreamController =
-      StreamController<NotificationResponse>();
-  static onTap(NotificationResponse response) {
-    notificationStreamController.add(response);
-    debugPrint("Notification clicked with payload: ${response.payload}");
-  }
+  static final AwesomeNotifications _awesome = AwesomeNotifications();
+  static const String alarmChannelKey = 'charging_alarm_channel';
+  static const int alarmNotificationId = 777; // ثابت للتحكم
 
-  static Future<void> initNotification() async {
-    InitializationSettings settings = InitializationSettings(
-      android: AndroidInitializationSettings("@mipmap/ic_launcher"),
-      iOS: DarwinInitializationSettings(),
-    );
-    await flutterLocalNotification.initialize(
-      settings,
-      onDidReceiveNotificationResponse: onTap,
-      onDidReceiveBackgroundNotificationResponse: onTap,
-    );
-  }
+  static Future<void> initNotifications() async {
+    await _awesome.initialize('resource://drawable/notification', [
+      NotificationChannel(
+        channelKey: alarmChannelKey,
+        channelName: 'Charging Alarm',
+        channelDescription: 'Persistent alarm when device starts charging',
+        importance: NotificationImportance.Max,
+        defaultColor: Colors.green,
+        channelShowBadge: true,
+        enableLights: true,
+        ledColor: Colors.green,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
+        playSound: true,
+        soundSource: 'resource://raw/sound',
+        defaultRingtoneType: DefaultRingtoneType.Alarm,
+        locked: true, // يمنع السحب
+        criticalAlerts: true,
+        
 
-  static showBasicNotification() async {
-    var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'your_channel_id',
-      'your_channel_name',
-      channelDescription: 'your_channel_description',
-      importance: Importance.max,
-      priority: Priority.high,
-      sound: RawResourceAndroidNotificationSound('sound'),
-    );
-    var iOSPlatformChannelSpecifics = DarwinNotificationDetails();
-    var platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
-    );
-    try {
-      await flutterLocalNotification.show(
-        0,
-        "🔋 Battery Alert",
-        "The Electricity is ON",
-        platformChannelSpecifics,
-        payload: "Basic Notification Payload",
-      );
-      return Future.value(true);
-    } catch (e) {
-      log("Error showing basic notification: $e");
-      return Future.value(false);
+      ),
+    ], debug: false);
+
+    if (!await _awesome.isNotificationAllowed()) {
+      await _awesome.requestPermissionToSendNotifications();
     }
+
+    // الاستماع لضغط زر الإيقاف
+    _awesome.setListeners(
+      onActionReceivedMethod: (received) async {
+        if (received.buttonKeyPressed == 'STOP_ALARM') {
+          await cancelAlarm();
+        }
+      },
+    );
   }
 
-  static Future<bool> showRepeatedNotification() async {
-    var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'your_channel_id_repeated',
-      'your_channel_name_repeated',
-      channelDescription: 'your_channel_description_repeated',
-      importance: Importance.max,
-      priority: Priority.high,
+  /// إشعار أساسي (غير متكرر ولا مستمر)
+  static Future<void> showBasicNotification() async {
+    await _awesome.createNotification(
+      content: NotificationContent(
+        id: 0,
+        channelKey: alarmChannelKey,
+        title: 'Charging Started',
+        body: 'The Electricity is Back!⚡',
+        notificationLayout: NotificationLayout.Default,
+        displayOnBackground: true,
+        displayOnForeground: true,
+      ),
     );
-    var iOSPlatformChannelSpecifics = DarwinNotificationDetails();
-    var platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
-    );
-    try {
-      await flutterLocalNotification.periodicallyShow(
-        1,
-        "🔋 Battery Alert",
-        "The Electricity is ON (Repeated)",
-        RepeatInterval.everyMinute,
-        platformChannelSpecifics,
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
-        payload: "Repeated Notification Payload",
-      );
-      log("Repeated notification");
-      return Future.value(true);
-    } catch (e) {
-      log("Error showing repeated notification: $e");
-      return Future.value(false);
-    }
   }
+
+  /// إشعار إنذار مستمر لا ينغلق ويكرر الصوت و يهز حتى يضغط المستخدم (Alarm Style)
+  static Future<void> showPersistentAlarm() async {
+    await _awesome.createNotification(
+      content: NotificationContent(
+        id: alarmNotificationId,
+        channelKey: alarmChannelKey,
+        title: '⚡ Power Restored',
+        body: 'Electricity is ON – Tap Stop to silence.',
+        category: NotificationCategory.Alarm,
+        autoDismissible: false, // لا يُغلق بالسحب
+        locked: true, // لا يمكن إزالته إلا بتفاعل
+        wakeUpScreen: true,
+        fullScreenIntent: true,
+        criticalAlert: true,
+        displayOnForeground: true,
+        displayOnBackground: true,
+        backgroundColor: Colors.black,
+        color: Colors.greenAccent,
+        notificationLayout: NotificationLayout.Default,
+        // تكرار الصوت عبر loopSound (مدعوم في القناة بالتشغيل) + صوت Alarm
+        // لو احتجت تكرار إضافي يمكنك جدولة تحديثات لكن غالباً هذا يكفي.
+      ),
+      actionButtons: [
+        NotificationActionButton(
+          key: 'STOP_ALARM',
+          label: 'Stop',
+          color: Colors.red,
+          autoDismissible: true,
+        ),
+      ],
+    );
+  }
+
+  /// إيقاف الإنذار المستمر
+  static Future<void> cancelAlarm() async {
+    await _awesome.cancel(alarmNotificationId);
+  }
+
+  /// للإلغاء الكلي (جميع الإشعارات)
+  static Future<void> cancelAll() async => _awesome.cancelAll();
 }

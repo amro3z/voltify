@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:voltify/background%20service/work_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -120,11 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     await data.setBool('appIsRunning', appIsRunning);
 
-    // Update work manager app running status
-    WorkManagerHandler.setAppRunning(appIsRunning);
-
-    // Trigger work manager to check charging status immediately
-    await WorkManagerHandler.triggerChargingCheck();
   }
 
   @override
