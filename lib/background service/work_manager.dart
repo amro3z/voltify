@@ -1,3 +1,4 @@
+// lib/background_service/work_manager.dart
 import 'dart:developer';
 import 'package:voltify/background%20service/background.dart';
 import 'package:workmanager/workmanager.dart';
@@ -9,9 +10,10 @@ class WorkManager {
   static Future<void> init() async {
     try {
       log("Starting Workmanager initialization");
-      await _instance.initialize(callbackDispatcher);
+      await _instance.initialize(callbackDispatcher, isInDebugMode: true);
       log("Workmanager initialized successfully");
-      await registerTask(id: "1", name: "Electricity on");
+
+      await registerTask(id: "wm_on_charge", name: "Electricity on");
     } catch (e) {
       log("Error during initialization or task registration: $e");
     }
@@ -22,22 +24,20 @@ class WorkManager {
     required String name,
   }) async {
     try {
-      await Workmanager().registerPeriodicTask(
+      await Workmanager().registerOneOffTask(
         id,
         name,
-        constraints:  Constraints(
-          requiresCharging: true,
-        ),
-        frequency: Duration(minutes: 15),
+        constraints: Constraints(requiresCharging: true),
+        existingWorkPolicy: ExistingWorkPolicy.replace,
       );
-      log("Task registered with id: $id and name: $name (charging constraint)");
+      log("Task registered with id: $id and name: $name (requiresCharging)");
     } catch (e) {
       log("Error registering task: $e");
     }
   }
 
-  static void cancelTask({required String taskId}) {
-    Workmanager().cancelByUniqueName(taskId);
-    log("Task cancelled");
+  static Future<void> cancelTask({required String uniqueName}) async {
+    await Workmanager().cancelByUniqueName(uniqueName);
+    log("Task cancelled: $uniqueName");
   }
 }
