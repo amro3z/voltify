@@ -6,7 +6,6 @@ import 'package:voltify/notification/local_service.dart';
 import 'package:voltify/screens/home_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:voltify/widget/alarm_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

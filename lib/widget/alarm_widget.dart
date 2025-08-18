@@ -3,7 +3,6 @@ import 'package:animated_analog_clock/animated_analog_clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AlarmWidget extends StatefulWidget {
   const AlarmWidget({super.key});
@@ -14,36 +13,14 @@ class AlarmWidget extends StatefulWidget {
 
 class _AlarmWidgetState extends State<AlarmWidget> {
   String? _timezone;
-  bool? _appIsRunning;
-  int? _lastActiveTs;
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _resolveTimezone();
-    _loadAppRunning();
     // تحديث دوري كل ثانيتين عشان نتأكد القيمة بتتغير فعلاً
-    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      _loadAppRunning();
-    });
-  }
-
-  Future<void> _loadAppRunning() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final val = prefs.getBool('appIsRunning');
-      final ts = prefs.getInt('last_active_ts');
-      if (mounted) {
-        setState(() {
-          _appIsRunning = val;
-          _lastActiveTs = ts;
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to load appIsRunning: $e');
-      if (mounted) setState(() => _appIsRunning = null);
-    }
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (_) {});
   }
 
   Future<void> _resolveTimezone() async {
@@ -131,39 +108,6 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                 fontSize: 16,
                 color: Colors.white,
                 fontFamily: 'CustomFont',
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'appIsRunning: ${_appIsRunning == null
-                  ? '...'
-                  : _appIsRunning == true
-                  ? 'true'
-                  : 'false'}',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white70,
-                fontFamily: 'CustomFont',
-              ),
-            ),
-            if (_lastActiveTs != null)
-              Text(
-                'lastActive: ${DateTime.fromMillisecondsSinceEpoch(_lastActiveTs!).toLocal().toIso8601String().substring(11, 19)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.white54,
-                  fontFamily: 'CustomFont',
-                ),
-              ),
-            TextButton(
-              onPressed: _loadAppRunning,
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: const Size(40, 22),
-              ),
-              child: const Text(
-                'Refresh',
-                style: TextStyle(fontSize: 11, color: Colors.lightGreenAccent),
               ),
             ),
           ],

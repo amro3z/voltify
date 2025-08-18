@@ -5,7 +5,6 @@ import 'package:awesome_notifications/android_foreground_service.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
-
 class NotificationController {
   /// بيتنادى لما المستخدم يضغط على زر أو على الإشعار نفسه
   @pragma('vm:entry-point')
@@ -49,8 +48,8 @@ class LocalService {
         enableVibration: true,
         vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
         playSound: true,
-        // الصوت لازم يكون في android/app/src/main/res/raw/sound.(wav/mp3)
-        soundSource: 'resource://raw/sound',
+        // يجب أن يكون لديك ملف alarm.mp3 أو alarm.wav في android/app/src/main/res/raw/
+        soundSource: 'resource://raw/alarm',
         defaultRingtoneType: DefaultRingtoneType.Alarm,
         locked: true,
         criticalAlerts: true,
@@ -143,9 +142,9 @@ class LocalService {
     );
 
     // شغّل ملف صوتي من الأصول وكرّره
-    // ضيف الملف في pubspec: assets/audio/alarm.mp3
+    // ضيف الملف في pubspec: assets/sounds/alarm.mp3
     if (_player.playing) await _player.stop();
-    await _player.setAsset('assets/audio/alarm.mp3');
+    await _player.setAsset('assets/sounds/alarm.mp3');
     await _player.setLoopMode(LoopMode.one);
     await _player.play();
   }
