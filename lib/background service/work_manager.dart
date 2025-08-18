@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'package:voltify/background%20service/background.dart';
 import 'package:workmanager/workmanager.dart';
 
-
 class WorkManager {
   static final Workmanager _instance = Workmanager();
 

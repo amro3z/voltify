@@ -103,7 +103,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
               ),
             ),
             const Text(
-              "The Electric Alarm",
+              "Electric Alarm!",
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.white,

@@ -18,6 +18,10 @@ void main() async {
   if (await Permission.notification.isDenied) {
     await Permission.notification.request();
   }
+  if (await Permission.systemAlertWindow.isDenied) {
+    await Permission.systemAlertWindow.request();
+  }
+    await LocalService.requestDndAccessIfNeeded();
   runApp(const Init());
 }
 

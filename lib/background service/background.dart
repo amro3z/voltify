@@ -15,28 +15,26 @@ void callbackDispatcher() {
 
       final prefs = await SharedPreferences.getInstance();
       final alertsEnabled = prefs.getBool('alerts_enabled') ?? true;
-      final onlyWhenOpen = prefs.getBool('only_when_open') ?? false;
-      final appIsRunning = prefs.getBool('appIsRunning') ?? false;
-      final lastActive = prefs.getInt('last_active_ts') ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final isReallyRunning = appIsRunning && (now - lastActive) < 10 * 1000;
+      // الاحتفاظ بالحاجات دي لو عايز تستخدمها لاحقًا
+      // final onlyWhenOpen = prefs.getBool('only_when_open') ?? false;
+      // final appIsRunning = prefs.getBool('appIsRunning') ?? false;
+      // final lastActive = prefs.getInt('last_active_ts') ?? 0;
 
       if (!alertsEnabled) return Future.value(true);
 
       if (task == _task) {
-        // لا تعرض أي شيء لو التطبيق مش شغال
-        if (!appIsRunning) return Future.value(true);
+        // 1) إشعار القناة (يعرض/يهتز/قد يرن حسب إعدادات الروم)
+        await LocalService.showPersistentAlarm();
 
-        // الشرط الآن يضمن أن التطبيق شغال بالفعل
-        final allow = appIsRunning && (!onlyWhenOpen || isReallyRunning);
-
-        if (allow) {
-          // إشعار ثابت + بدء رنّة مستمرة
-          await LocalService.showPersistentAlarm();
+        // 2) الصوت الحقيقي عبر FGS + just_audio (Alarm usage)
+        //    نشغّله دايمًا حتى لو التطبيق Terminated
+        try {
           await LocalService.startRingingLoop();
+        } catch (_) {
+          // fallback: تجاهل أي خطأ بدون كراش
         }
 
-        // إعادة التسجـيل للمرّة الجاية (one-off pattern)
+        // إعادة التسجيـل للمرّة الجاية (one-off pattern)
         await Workmanager().registerOneOffTask(
           _unique,
           _task,
