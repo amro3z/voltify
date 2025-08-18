@@ -116,21 +116,6 @@ class LocalService {
     );
   }
 
-  /// إشعار بسيط (اختياري للاختبار)
-  static Future<void> showBasicNotification() async {
-    await _awesome.createNotification(
-      content: NotificationContent(
-        id: 0,
-        channelKey: alarmChannelKey,
-        title: 'Charging Started',
-        body: 'The Electricity is Back! ⚡',
-        notificationLayout: NotificationLayout.Default,
-        displayOnBackground: true,
-        displayOnForeground: true,
-      ),
-    );
-  }
-
   /// إشعار إنذار ثابت + زر إيقاف (صوت القناة يشتغل حتى لو التطبيق مقفول)
   static Future<void> showPersistentAlarm() async {
     await _awesome.createNotification(

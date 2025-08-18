@@ -15,10 +15,7 @@ void callbackDispatcher() {
 
       final prefs = await SharedPreferences.getInstance();
       final alertsEnabled = prefs.getBool('alerts_enabled') ?? true;
-      // الاحتفاظ بالحاجات دي لو عايز تستخدمها لاحقًا
-      // final onlyWhenOpen = prefs.getBool('only_when_open') ?? false;
-      // final appIsRunning = prefs.getBool('appIsRunning') ?? false;
-      // final lastActive = prefs.getInt('last_active_ts') ?? 0;
+
 
       if (!alertsEnabled) return Future.value(true);
 

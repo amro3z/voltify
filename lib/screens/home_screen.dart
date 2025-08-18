@@ -19,7 +19,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
   bool appIsRunning = false;
-  bool? _storedAppIsRunning; // القيمة القادمة مباشرة من SharedPreferences
   bool _prefsReady = false; // للتأكد إننا ما نستخدمش data قبل التهيئة
   BatteryState _batteryState = BatteryState.unknown;
   late StreamSubscription<BatteryState> _batteryStateSubscription;
@@ -35,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
           data = sp;
           setState(() {
             appIsRunning = data.getBool('appIsRunning') ?? false;
-            _storedAppIsRunning = appIsRunning;
             _prefsReady = true;
           });
 
@@ -68,12 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (!mounted || !_prefsReady) return;
             final level = await _battery.batteryLevel;
             final mode = await _battery.isInBatterySaveMode;
-            final sharedFlag = data.getBool('appIsRunning');
             if (mounted) {
               setState(() {
                 _batteryLevel = level;
                 _isInBatterySaveMode = mode;
-                _storedAppIsRunning = sharedFlag;
               });
             }
           });
@@ -125,7 +121,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final newVal = !appIsRunning;
     setState(() {
       appIsRunning = newVal;
-      _storedAppIsRunning = newVal; // تحديث فوري للعرض
     });
     await data.setBool('appIsRunning', newVal);
     if (newVal) {
@@ -233,19 +228,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Text(
-              _prefsReady
-                  ? 'Shared(appIsRunning) = ${_storedAppIsRunning == null ? 'null' : _storedAppIsRunning}'
-                  : 'Loading shared flag...',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.white70,
-                fontFamily: 'CustomFont',
-              ),
-            ),
-          ),
           const Spacer(),
           const Text(
             'This app monitors the battery status and notifies you when the electricity comes back.',
