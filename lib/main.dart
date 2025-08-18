@@ -6,14 +6,12 @@ import 'package:voltify/notification/local_service.dart';
 import 'package:voltify/screens/home_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:voltify/widget/alarm_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize WorkManager and LocalService before running the app
-  await Future.wait([
-    WorkManager.init(),
-    LocalService.initNotifications(),
-  ]);
+  await Future.wait([WorkManager.init(), LocalService.initNotifications()]);
   tz.initializeTimeZones();
   if (await FlutterOverlayWindow.isPermissionGranted() == false) {
     await FlutterOverlayWindow.requestPermission();
@@ -35,8 +33,15 @@ void overlayMain() {
   );
 }
 
-class Init extends StatelessWidget {
+class Init extends StatefulWidget {
   const Init({super.key});
+
+  @override
+  State<Init> createState() => _InitState();
+}
+
+class _InitState extends State<Init> {
+  // أزلنا أي تحكم تلقائي في appIsRunning هنا
 
   @override
   Widget build(BuildContext context) {

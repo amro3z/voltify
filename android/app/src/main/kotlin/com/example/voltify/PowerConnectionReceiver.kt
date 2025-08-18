@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.content.SharedPreferences
 import flutter.overlay.window.flutter_overlay_window.OverlayService
 
 class PowerConnectionReceiver : BroadcastReceiver() {
@@ -13,6 +14,13 @@ class PowerConnectionReceiver : BroadcastReceiver() {
         Log.d("PowerReceiver", "Received action: $action")
 
         if (action == Intent.ACTION_POWER_CONNECTED) {
+            // اقرأ حالة التطبيق
+            val prefs: SharedPreferences = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            val appIsRunning = prefs.getBoolean("flutter.appIsRunning", false)
+            if (!appIsRunning) {
+                Log.d("PowerReceiver", "App not running -> skip overlay")
+                return
+            }
             try {
                 val serviceIntent = Intent(context, OverlayService::class.java).apply {
                     putExtra("enableDrag", true)

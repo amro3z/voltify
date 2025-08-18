@@ -24,7 +24,11 @@ void callbackDispatcher() {
       if (!alertsEnabled) return Future.value(true);
 
       if (task == _task) {
-        final allow = !onlyWhenOpen || isReallyRunning;
+        // لا تعرض أي شيء لو التطبيق مش شغال
+        if (!appIsRunning) return Future.value(true);
+
+        // الشرط الآن يضمن أن التطبيق شغال بالفعل
+        final allow = appIsRunning && (!onlyWhenOpen || isReallyRunning);
 
         if (allow) {
           // إشعار ثابت + بدء رنّة مستمرة
@@ -36,7 +40,7 @@ void callbackDispatcher() {
         await Workmanager().registerOneOffTask(
           _unique,
           _task,
-          constraints:  Constraints(requiresCharging: true),
+          constraints: Constraints(requiresCharging: true),
           existingWorkPolicy: ExistingWorkPolicy.replace,
         );
       }

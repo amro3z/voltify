@@ -19,6 +19,8 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isInBatterySaveMode = false;
   int _batteryLevel = 0;
   bool appIsRunning = false;
+  bool? _storedAppIsRunning; // القيمة القادمة مباشرة من SharedPreferences
+  bool _prefsReady = false; // للتأكد إننا ما نستخدمش data قبل التهيئة
   BatteryState _batteryState = BatteryState.unknown;
   late StreamSubscription<BatteryState> _batteryStateSubscription;
   Timer? _batteryInfoTimer;
@@ -33,10 +35,13 @@ class _HomeScreenState extends State<HomeScreen> {
           data = sp;
           setState(() {
             appIsRunning = data.getBool('appIsRunning') ?? false;
+            _storedAppIsRunning = appIsRunning;
+            _prefsReady = true;
           });
 
           // نحدث الـ TimeZone بعد تهيئة data
           FlutterTimezone.getLocalTimezone().then((String timezone) {
+            if (!mounted) return;
             setState(() {
               currentTimeZone = timezone;
               data.setString('currentTimeZone', timezone);
@@ -46,10 +51,11 @@ class _HomeScreenState extends State<HomeScreen> {
           // نحدث حالة البطارية بعد تهيئة data
           _battery.batteryState.then(_updateBatteryState);
           _battery.batteryLevel.then(
-            (level) => setState(() => _batteryLevel = level),
+            (level) => mounted ? setState(() => _batteryLevel = level) : null,
           );
           _battery.isInBatterySaveMode.then(
-            (mode) => setState(() => _isInBatterySaveMode = mode),
+            (mode) =>
+                mounted ? setState(() => _isInBatterySaveMode = mode) : null,
           );
 
           _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
@@ -59,20 +65,21 @@ class _HomeScreenState extends State<HomeScreen> {
           _batteryInfoTimer = Timer.periodic(const Duration(seconds: 5), (
             _,
           ) async {
-            // زيادة المدة
-            if (!mounted) return; // لو الـ Widget مات، يرجع
+            if (!mounted || !_prefsReady) return;
             final level = await _battery.batteryLevel;
             final mode = await _battery.isInBatterySaveMode;
+            final sharedFlag = data.getBool('appIsRunning');
             if (mounted) {
               setState(() {
                 _batteryLevel = level;
                 _isInBatterySaveMode = mode;
+                _storedAppIsRunning = sharedFlag;
               });
             }
           });
         })
         .catchError((e) {
-          print("Error initializing SharedPreferences: $e");
+          debugPrint("Error initializing SharedPreferences: $e");
         });
   }
 
@@ -113,12 +120,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void toggleAppRunning() async {
+  Future<void> toggleAppRunning() async {
+    if (!_prefsReady) return;
+    final newVal = !appIsRunning;
     setState(() {
-      appIsRunning = !appIsRunning;
+      appIsRunning = newVal;
+      _storedAppIsRunning = newVal; // تحديث فوري للعرض
     });
-    await data.setBool('appIsRunning', appIsRunning);
-
+    await data.setBool('appIsRunning', newVal);
+    if (newVal) {
+      await data.setInt(
+        'last_active_ts',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    }
   }
 
   @override
@@ -192,19 +207,41 @@ class _HomeScreenState extends State<HomeScreen> {
                 : Colors.green,
           ),
           const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              toggleAppRunning();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+          if (!_prefsReady)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: CircularProgressIndicator(),
+            )
+          else
+            ElevatedButton(
+              onPressed: () {
+                toggleAppRunning();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
+              ),
+              child: Text(
+                appIsRunning ? 'Stop' : 'Start',
+                style: const TextStyle(
+                  fontSize: 20,
+                  color: Colors.black,
+                  fontFamily: 'CustomFont',
+                ),
+              ),
             ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
             child: Text(
-              appIsRunning ? 'Stop' : 'Start',
+              _prefsReady
+                  ? 'Shared(appIsRunning) = ${_storedAppIsRunning == null ? 'null' : _storedAppIsRunning}'
+                  : 'Loading shared flag...',
               style: const TextStyle(
-                fontSize: 20,
-                color: Colors.black,
+                fontSize: 14,
+                color: Colors.white70,
                 fontFamily: 'CustomFont',
               ),
             ),
