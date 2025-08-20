@@ -8,7 +8,7 @@ class WorkManager {
 
   static Future<void> init() async {
     try {
-      log("Starting Workmanager initialization");
+      print("Starting Workmanager initialization =====");
       await _instance.initialize(callbackDispatcher, isInDebugMode: true);
       log("Workmanager initialized successfully");
 

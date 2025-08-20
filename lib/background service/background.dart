@@ -15,23 +15,17 @@ void callbackDispatcher() {
 
       final prefs = await SharedPreferences.getInstance();
       final alertsEnabled = prefs.getBool('alerts_enabled') ?? true;
-
+      final appIsRunning = prefs.getBool('appIsRunning') ?? false;
 
       if (!alertsEnabled) return Future.value(true);
 
-      if (task == _task) {
-        // 1) إشعار القناة (يعرض/يهتز/قد يرن حسب إعدادات الروم)
+      if (task == _task && appIsRunning) {
         await LocalService.showPersistentAlarm();
-
-        // 2) الصوت الحقيقي عبر FGS + just_audio (Alarm usage)
-        //    نشغّله دايمًا حتى لو التطبيق Terminated
         try {
           await LocalService.startRingingLoop();
         } catch (_) {
-          // fallback: تجاهل أي خطأ بدون كراش
         }
 
-        // إعادة التسجيـل للمرّة الجاية (one-off pattern)
         await Workmanager().registerOneOffTask(
           _unique,
           _task,

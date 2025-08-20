@@ -86,12 +86,6 @@ class _HomeScreenState extends State<HomeScreen> {
       data.setString('batteryState', state.toString());
     });
 
-    // Note: Overlay control is now handled by PowerConnectionReceiver
-    // for better background support. This prevents conflicts between
-    // Flutter battery listener and native broadcast receiver.
-
-    // Just update the UI state, don't control overlay here
-    // The PowerConnectionReceiver will handle overlay show/hide
   }
 
   @override
