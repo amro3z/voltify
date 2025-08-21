@@ -53,7 +53,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.all(Radius.circular(20)),
         gradient: RadialGradient(
-          colors: [Colors.black, Colors.red],
+          colors: [Colors.black, Colors.green],
           center: Alignment.center,
           radius: 2,
         ),

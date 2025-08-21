@@ -92,7 +92,7 @@ class LocalService {
         defaultColor: Colors.green,
         channelShowBadge: true,
         enableLights: true,
-        ledColor: Colors.green,
+        ledColor: Colors.green, 
         enableVibration: true,
         vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
         playSound: true, // لازم
@@ -145,13 +145,10 @@ class LocalService {
     );
   }
 
-  /// رنّة متكررة عبر Foreground Service + just_audio (Alarm usage)
-  /// هنضمن الأول إن وضع الصوت مسموع (sound_mode) ثم نشغّل الصوت
   static Future<void> startRingingLoop() async {
-    // تأكد الجهاز على وضع مسموع
+
     await _ensureAudible();
 
-    // إشعار الخدمة الأمامية (يظهر كثابت)
     await AndroidForegroundService.startAndroidForegroundService(
       content: NotificationContent(
         id: fgServiceNotiId,

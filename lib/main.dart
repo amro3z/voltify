@@ -3,55 +3,117 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:voltify/background%20service/work_manager.dart';
 import 'package:voltify/notification/local_service.dart';
-import 'package:voltify/screens/home_screen.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:voltify/screens/welcome_screen.dart';
 import 'package:voltify/widget/alarm_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voltify/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize WorkManager and LocalService before running the app
   await Future.wait([WorkManager.init(), LocalService.initNotifications()]);
   tz.initializeTimeZones();
-  if (await FlutterOverlayWindow.isPermissionGranted() == false) {
-    await FlutterOverlayWindow.requestPermission();
-  }
-  if (await Permission.notification.isDenied) {
-    await Permission.notification.request();
-  }
-  if (await Permission.systemAlertWindow.isDenied) {
-    await Permission.systemAlertWindow.request();
-  }
-    await LocalService.requestDndAccessIfNeeded();
   runApp(const Init());
 }
 
 @pragma("vm:entry-point")
 void overlayMain() {
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
-      home: AlarmWidget(),
-    ),
-  );
+  WidgetsFlutterBinding.ensureInitialized();
+  FlutterOverlayWindow.isPermissionGranted().then((granted) {
+    if (granted) {
+      runApp(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData.dark(),
+          home: const AlarmWidget(),
+        ),
+      );
+    } else {
+      debugPrint("Overlay permission not granted");
+    }
+  });
 }
 
 class Init extends StatefulWidget {
   const Init({super.key});
-
   @override
   State<Init> createState() => _InitState();
 }
 
-class _InitState extends State<Init> {
-  // أزلنا أي تحكم تلقائي في appIsRunning هنا
+class _InitState extends State<Init> with WidgetsBindingObserver {
+  bool _handlingResume = false;
+  bool? _seenWelcome; // null = لسه بتحميل
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadSeenWelcome();
+  }
+
+  Future<void> _loadSeenWelcome() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _seenWelcome = prefs.getBool('seen_welcome') ?? false;
+      });
+    } catch (e) {
+      debugPrint('⚠️ load prefs error: $e');
+      setState(() => _seenWelcome = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _onAppResumed();
+    }
+  }
+
+  Future<void> _onAppResumed() async {
+    if (_handlingResume) return;
+    _handlingResume = true;
+    try {
+      await Future.delayed(const Duration(milliseconds: 500));
+      final overlayGranted = await FlutterOverlayWindow.isPermissionGranted();
+      final notifGranted = await Permission.notification.status;
+      final sysAlertGranted = await Permission.systemAlertWindow.status;
+      debugPrint(
+        "Overlay:$overlayGranted  Notif:${notifGranted.isGranted}  SysAlert:${sysAlertGranted.isGranted}",
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint("⚠️ Error on resume handling: $e");
+    } finally {
+      _handlingResume = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // لسه محمّل الـ prefs؟ اعرض لودينج خفيف
+    if (_seenWelcome == null) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
+    // لو شاف ويلكم قبل كده -> يروح للـ Home مباشرة
+    final Widget start = (_seenWelcome == true)
+        ? const HomeScreen()
+        : const WelcomeScreen();
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
-      home: const HomeScreen(),
+      home: start,
     );
   }
 }

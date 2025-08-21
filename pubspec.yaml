@@ -39,6 +39,7 @@ dependencies:
   flutter_overlay_window: ^0.5.0
   flutter_timezone: ^4.1.1
   just_audio: ^0.10.4
+  lottie: ^3.3.1
   path_provider: ^2.1.5
   percent_indicator: ^4.2.5
   permission_handler: ^12.0.1
@@ -50,7 +51,6 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
-
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -68,6 +68,7 @@ flutter:
   assets:
     - assets/sounds/
     - assets/images/
+    - assets/animation/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

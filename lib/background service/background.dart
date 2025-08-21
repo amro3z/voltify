@@ -10,7 +10,6 @@ const _task = 'Electricity on';
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      // تهيئة القنوات والـlisteners في العزل الخلفي
       await LocalService.initNotifications();
 
       final prefs = await SharedPreferences.getInstance();
@@ -20,11 +19,11 @@ void callbackDispatcher() {
       if (!alertsEnabled) return Future.value(true);
 
       if (task == _task && appIsRunning) {
+        print('app is running: ${appIsRunning.toString()}');
         await LocalService.showPersistentAlarm();
         try {
           await LocalService.startRingingLoop();
-        } catch (_) {
-        }
+        } catch (_) {}
 
         await Workmanager().registerOneOffTask(
           _unique,

@@ -8,13 +8,13 @@ class WorkManager {
 
   static Future<void> init() async {
     try {
-      print("Starting Workmanager initialization =====");
+      print("Starting Workmanager initialization ");
       await _instance.initialize(callbackDispatcher, isInDebugMode: true);
-      log("Workmanager initialized successfully");
+      print("Workmanager initialized successfully");
 
       await registerTask(id: "wm_on_charge", name: "Electricity on");
     } catch (e) {
-      log("Error during initialization or task registration: $e");
+      print("Error during initialization or task registration: $e");
     }
   }
 
