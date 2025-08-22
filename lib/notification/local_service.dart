@@ -37,7 +37,8 @@ class LocalService {
   static final AudioPlayer _player = AudioPlayer();
 
   // قناة جديدة لضمان وجود صوت من النظام
-  static const String alarmChannelKey = 'charging_alarm_channel_v2';
+  static const String alarmChannelKey =
+      'charging_alarm_channel_v3'; // مفتاح جديد
   static const int alarmNotificationId = 777; // ثابت
   static const int fgServiceNotiId = 7001; // إشعار الخدمة الأمامية
 
@@ -45,11 +46,11 @@ class LocalService {
   static Future<void> requestDndAccessIfNeeded() async {
     try {
       final granted = await sm_perm.PermissionHandler.permissionsGranted;
-      if (!granted!) {
+      if (!(granted ?? false)) {
         await sm_perm.PermissionHandler.openDoNotDisturbSetting();
       }
     } catch (_) {
-      // تجاهل الخطأ
+      // تجاهل
     }
   }
 
@@ -57,12 +58,11 @@ class LocalService {
   static Future<void> _ensureAudible() async {
     try {
       final granted = await sm_perm.PermissionHandler.permissionsGranted;
-      if (!granted!) {
+      if (!(granted ?? false)) {
         await sm_perm.PermissionHandler.openDoNotDisturbSetting();
         return;
       }
 
-      // الحزمة بترجع String: 'normal'/'silent'/'vibrate' (أحيانًا فيها prefix)
       final rawStatus = await SoundMode.ringerModeStatus;
       final s = rawStatus.toString().toLowerCase();
 
@@ -77,36 +77,49 @@ class LocalService {
         }
       }
     } catch (_) {
-      // نكمل من غير ما نكسر حاجة
+      // تجاهل
     }
   }
 
-  /// call once (main.dart)
-  static Future<void> initNotifications() async {
-    await _awesome.initialize('resource://drawable/notification', [
-      NotificationChannel(
-        channelKey: alarmChannelKey,
-        channelName: 'Charging Alarm',
-        channelDescription: 'Persistent alarm when device starts charging',
-        importance: NotificationImportance.Max,
-        defaultColor: Colors.green,
-        channelShowBadge: true,
-        enableLights: true,
-        ledColor: Colors.green, 
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
-        playSound: true, // لازم
-        soundSource:
-            'resource://raw/alarm', // ضع الملف في android/app/src/main/res/raw/alarm.mp3
-        defaultRingtoneType: DefaultRingtoneType.Alarm, // Alarm stream
-        locked: true,
-        criticalAlerts: false, // مش هنكسر DND
-      ),
-    ], debug: false);
+// lib/notification/local_service.dart
 
-    // Android 13+: runtime permission
-    if (!await _awesome.isNotificationAllowed()) {
-      await _awesome.requestPermissionToSendNotifications();
+  static Future<void> initNotifications({bool background = false}) async {
+    // 1) أنشئ القناة في initialize بدل setChannel(forceUpdate)
+    await _awesome.initialize(
+      'resource://drawable/notification', // أي أيقونة صغيرة شفافة
+      [
+        NotificationChannel(
+          channelKey: alarmChannelKey, // مثال: 'charging_alarm_channel_v3'
+          channelName: 'Charging Alarm',
+          channelDescription: 'Persistent alarm when device starts charging',
+          importance: NotificationImportance.Max,
+          defaultColor: Colors.green,
+          channelShowBadge: true,
+          enableLights: true,
+          ledColor: Colors.green,
+          enableVibration: true,
+          vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
+          playSound: true,
+          soundSource: 'resource://raw/alarm', // من res/raw/alarm.mp3
+          defaultRingtoneType: DefaultRingtoneType.Alarm,
+          locked: true,
+          criticalAlerts: false,
+        ),
+      ],
+      debug: false,
+    );
+
+    // 2) اطلب الإذن (مش في الخلفية)
+    if (!background && !await _awesome.isNotificationAllowed()) {
+      await _awesome.requestPermissionToSendNotifications(
+        permissions: const [
+          NotificationPermission.Alert,
+          NotificationPermission.Sound,
+          NotificationPermission.Vibration,
+          NotificationPermission.Light,
+          NotificationPermission.OverrideDnD,
+        ],
+      );
     }
 
     _awesome.setListeners(
@@ -114,6 +127,15 @@ class LocalService {
       onDismissActionReceivedMethod:
           NotificationController.onDismissActionReceivedMethod,
     );
+  }
+
+
+  /// افتح إعدادات إشعارات التطبيق/القناة (مفيد للدعم)
+  static Future<void> openChannelSettings() async {
+    try {
+      await _awesome
+          .showNotificationConfigPage(); // يفتح صفحة إعدادات إشعارات التطبيق
+    } catch (_) {}
   }
 
   /// إشعار إنذار ثابت + زر إيقاف (صوت القناة يشتغل حتى لو التطبيق مقفول)
@@ -145,10 +167,11 @@ class LocalService {
     );
   }
 
+  /// رنّة طويلة تتكرر عبر just_audio (من الأصول)
   static Future<void> startRingingLoop() async {
-
     await _ensureAudible();
 
+    // Foreground service للإعلام عن تشغيل الصوت بالخلفية
     await AndroidForegroundService.startAndroidForegroundService(
       content: NotificationContent(
         id: fgServiceNotiId,
@@ -173,7 +196,7 @@ class LocalService {
       foregroundServiceType: ForegroundServiceType.mediaPlayback,
     );
 
-    // اضبط الجلسة على Alarm usage (عشان يرن في Silent)
+    // اضبط الجلسة على Alarm usage
     final session = await AudioSession.instance;
     await session.configure(
       const AudioSessionConfiguration(
@@ -194,8 +217,12 @@ class LocalService {
   }
 
   static Future<void> stopRingingLoop() async {
-    await _player.stop();
-    await AndroidForegroundService.stopForeground(fgServiceNotiId);
+    try {
+      await _player.stop();
+    } catch (_) {}
+    try {
+      await AndroidForegroundService.stopForeground(fgServiceNotiId);
+    } catch (_) {}
   }
 
   static Future<void> cancelAlarm() async {

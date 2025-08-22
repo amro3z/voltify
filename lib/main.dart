@@ -11,8 +11,9 @@ import 'package:voltify/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Future.wait([WorkManager.init(), LocalService.initNotifications()]);
   tz.initializeTimeZones();
+
+  // متستناش تهيئات تقيلة هنا؛ اعرض UI بسرعة
   runApp(const Init());
 }
 
@@ -49,6 +50,18 @@ class _InitState extends State<Init> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadSeenWelcome();
+
+    // ✨ نفّذ التهيئات التقيلة بعد أول فريم علشان السبلاتش تختفي فورًا
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await Future.wait([
+          WorkManager.init(),
+          LocalService.initNotifications(), // فيها طلب إذن POST_NOTIFICATIONS لو محتاج
+        ]);
+      } catch (e) {
+        debugPrint('Init heavy tasks error: $e');
+      }
+    });
   }
 
   Future<void> _loadSeenWelcome() async {
@@ -97,7 +110,6 @@ class _InitState extends State<Init> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // لسه محمّل الـ prefs؟ اعرض لودينج خفيف
     if (_seenWelcome == null) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -105,7 +117,6 @@ class _InitState extends State<Init> with WidgetsBindingObserver {
       );
     }
 
-    // لو شاف ويلكم قبل كده -> يروح للـ Home مباشرة
     final Widget start = (_seenWelcome == true)
         ? const HomeScreen()
         : const WelcomeScreen();

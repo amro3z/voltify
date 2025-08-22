@@ -8,8 +8,8 @@ class WorkManager {
 
   static Future<void> init() async {
     try {
-      print("Starting Workmanager initialization ");
-      await _instance.initialize(callbackDispatcher, isInDebugMode: true);
+      print("Starting Workmanager initialization⚡⚡⚡⚡ ");
+      await _instance.initialize(callbackDispatcher);
       print("Workmanager initialized successfully");
 
       await registerTask(id: "wm_on_charge", name: "Electricity on");

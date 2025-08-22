@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    requestPermissions();
+    requestPermissions(); // يبدأ الفلو
     _initialize();
   }
 
@@ -42,14 +42,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_isInitializing) return;
     _isInitializing = true;
     try {
-      // تهيئة SharedPreferences
       data = await SharedPreferences.getInstance();
       setState(() {
         appIsRunning = data.getBool('appIsRunning') ?? false;
         _prefsReady = true;
       });
 
-      // تحديث الـ TimeZone
       final String timezone = await FlutterTimezone.getLocalTimezone();
       if (!mounted) return;
       setState(() {
@@ -57,21 +55,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         data.setString('currentTimeZone', timezone);
       });
 
-      // تحديث حالة البطارية
       await _updateBatteryInfo();
 
-      // إعداد الـ Stream Subscription
       _batteryStateSubscription = _battery.onBatteryStateChanged.listen(
         _updateBatteryState,
       );
 
-      // إعداد التايمر
       _batteryInfoTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
         if (!mounted || !_prefsReady) return;
         await _updateBatteryInfo();
       });
     } catch (e) {
-      debugPrint("⚠️ خطأ أثناء التهيئة: $e");
+      debugPrint("⚠️ Error initializing: $e");
     } finally {
       _isInitializing = false;
     }
@@ -93,35 +88,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      debugPrint("⚠️ خطأ فى تحديث بيانات البطارية: $e");
+      debugPrint("⚠️ Error updating battery info: $e");
     }
   }
 
   Future<void> requestPermissions() async {
     try {
-      // اطلب overlay: البلجن هيفتح صفحة الإعدادات لو مش متاحة
-      final hadOverlay = await FlutterOverlayWindow.isPermissionGranted();
-      if (!hadOverlay) {
-        await FlutterOverlayWindow.requestPermission(); // هنرجع للتطبيق بعد السماح/الرفض
+      final hasOverlay = await FlutterOverlayWindow.isPermissionGranted();
+      if (!hasOverlay) {
+        await FlutterOverlayWindow.requestPermission();
+        return; // هنكمّل بعد الرجوع
       }
 
-      // اطلب Notification على أندرويد 13+ (مش بيفتح Settings دايمًا)
-      if (await Permission.notification.isDenied) {
+      final notif = await Permission.notification.status;
+      if (notif.isDenied || notif.isRestricted) {
         await Permission.notification.request();
       }
 
-      // systemAlertWindow (لو بتستخدمها فعلًا)
-      if (await Permission.systemAlertWindow.isDenied) {
+      final sys = await Permission.systemAlertWindow.status;
+      if (sys.isDenied || sys.isRestricted) {
         await Permission.systemAlertWindow.request();
+        return; // هنكمّل بعد الرجوع
       }
 
-      // DND access عن طريق خدمتك
       await LocalService.requestDndAccessIfNeeded();
-
-      // مهم: ما تعملش أي تهيئة Plugins تقيلة هنا بعد الرجوع.
-      // سيب إعادة الفحص والأكشن لـ didChangeAppLifecycleState -> resumed
     } catch (e) {
-      debugPrint("⚠️ خطأ أثناء طلب الأذونات: $e");
+      debugPrint("perm error: $e");
     }
   }
 
@@ -146,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _initialize();
+      requestPermissions(); // كمّل فلو الصلاحيات بعد الرجوع من Settings
     }
   }
 
@@ -278,7 +271,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: toggleAppRunning,
+                        onPressed: () async {
+                          await toggleAppRunning();
+                          await requestPermissions(); // ينفع تبدأ من الزر برضه
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           padding: const EdgeInsets.symmetric(
@@ -293,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           appIsRunning ? 'Stop' : 'Start',
                           style: const TextStyle(
                             fontSize: 20,
-                            color: Colors.black,
+                            color: Colors.brown,
                             fontFamily: 'CustomFont',
                           ),
                         ),

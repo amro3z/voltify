@@ -38,7 +38,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
     if (!mounted) return;
     Navigator.of(context).pop(); // اقفل الدايالوج
-    // 3) بدّل الشاشة بالـ Home (عشان Back ميرجعش للويلكم)
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const HomeScreen()),
