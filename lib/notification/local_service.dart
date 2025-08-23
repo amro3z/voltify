@@ -25,7 +25,6 @@ class NotificationController {
       await LocalService.cancelAlarm();
       return;
     }
-    // الضغط على جسم الإشعار
     if (action.channelKey == LocalService.alarmChannelKey &&
         action.buttonKeyPressed == null) {
       await LocalService.stopRingingLoop();
@@ -100,22 +99,18 @@ class LocalService {
           enableLights: true,
           ledColor: Colors.green,
           enableVibration: true,
-          // نخلي القناة نفسها عندها صوت (مرة واحدة) كنسخة احتياطية
-          // وفي نفس الوقت هانشغّل لوب طويل بـ just_audio:
           playSound: true,
           soundSource:
-              'resource://raw/alarm', // android/app/src/main/res/raw/alarm.mp3
+              'resource://raw/alarm', 
           defaultRingtoneType:
-              DefaultRingtoneType.Alarm, // يتأثر من Alarm volume
-          locked: true, // إشعار لا يُسحب
+              DefaultRingtoneType.Alarm,
+          locked: true, 
           criticalAlerts: false,
           vibrationPattern: Int64List.fromList([0, 900, 400, 1100, 400, 1300]),
         ),
       ],
       debug: false,
     );
-print("Initialized notifications");
-    // إذن الإشعارات (Android 13+)
     if (!background && !await _awesome.isNotificationAllowed()) {
       await _awesome.requestPermissionToSendNotifications(
         permissions: const [
@@ -135,14 +130,12 @@ print("Initialized notifications");
     );
   }
 
-  /// فتح إعدادات إشعارات التطبيق/القناة
   static Future<void> openChannelSettings() async {
     try {
       await _awesome.showNotificationConfigPage();
     } catch (_) {}
   }
 
-  /// إشعار إنذار ثابت + زر إيقاف (صوت القناة “نبّهة” سريعة + اللوك)
   static Future<void> showPersistentAlarm() async {
     await _awesome.createNotification(
       content: NotificationContent(
