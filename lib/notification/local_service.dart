@@ -1,28 +1,39 @@
 // lib/notification/local_service.dart
+import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:awesome_notifications/android_foreground_service.dart';
 import 'package:flutter/material.dart';
+
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 
-// sound_mode (للسيطرة على وضع الرنين + إذن DND)
+// للتحكم في وضع الرنين + إذن عدم الإزعاج (DND)
 import 'package:flutter/services.dart';
 import 'package:sound_mode/sound_mode.dart';
 import 'package:sound_mode/utils/ringer_mode_statuses.dart';
 import 'package:sound_mode/permission_handler.dart' as sm_perm;
 
 class NotificationController {
-  /// بيتنادى لما المستخدم يضغط على زر أو على الإشعار نفسه
+  /// يتم استدعاؤها عند الضغط على زر من داخل الإشعار أو الضغط على الإشعار نفسه
   @pragma('vm:entry-point')
   static Future<void> onActionReceivedMethod(ReceivedAction action) async {
+    // زر إيقاف
     if (action.buttonKeyPressed == 'STOP_ALARM') {
+      await LocalService.stopRingingLoop();
+      await LocalService.cancelAlarm();
+      return;
+    }
+    // الضغط على جسم الإشعار
+    if (action.channelKey == LocalService.alarmChannelKey &&
+        action.buttonKeyPressed == null) {
       await LocalService.stopRingingLoop();
       await LocalService.cancelAlarm();
     }
   }
 
-  /// بيتنادى لما الإشعار يتقفل/يتسحب
+  /// يتندّى لما الإشعار يتقفل/يتسحب
   @pragma('vm:entry-point')
   static Future<void> onDismissActionReceivedMethod(
     ReceivedAction action,
@@ -36,25 +47,25 @@ class LocalService {
   static final AwesomeNotifications _awesome = AwesomeNotifications();
   static final AudioPlayer _player = AudioPlayer();
 
-  // قناة جديدة لضمان وجود صوت من النظام
-  static const String alarmChannelKey =
-      'charging_alarm_channel_v3'; // مفتاح جديد
-  static const int alarmNotificationId = 777; // ثابت
+  // غيّر المفتاح لو سبق جرّبت قناة قديمة عشان تتأكد إعدادات القناة تتطبّق فعلاً
+  static const String alarmChannelKey = 'charging_alarm_channel_v6';
+  static const int alarmNotificationId = 777; // إشعار المنبّه
   static const int fgServiceNotiId = 7001; // إشعار الخدمة الأمامية
 
-  /// اطلب إذن DND Access (مرة واحدة عند تشغيل التطبيق)
+  static StreamSubscription<AudioInterruptionEvent>? _intSub;
+  static StreamSubscription<void>? _noisySub;
+
+  /// طلب إذن DND (مرة واحدة)
   static Future<void> requestDndAccessIfNeeded() async {
     try {
       final granted = await sm_perm.PermissionHandler.permissionsGranted;
       if (!(granted ?? false)) {
         await sm_perm.PermissionHandler.openDoNotDisturbSetting();
       }
-    } catch (_) {
-      // تجاهل
-    }
+    } catch (_) {}
   }
 
-  /// قبل تشغيل الرنّة: لو الموبايل Silent/Vibrate نحوله Normal
+  /// قبل التشغيل: لو الموبايل Silent/Vibrate نحوله Normal (قد يتطلب إذن DND من بعض الأجهزة)
   static Future<void> _ensureAudible() async {
     try {
       final granted = await sm_perm.PermissionHandler.permissionsGranted;
@@ -62,54 +73,49 @@ class LocalService {
         await sm_perm.PermissionHandler.openDoNotDisturbSetting();
         return;
       }
-
-      final rawStatus = await SoundMode.ringerModeStatus;
-      final s = rawStatus.toString().toLowerCase();
-
-      final isSilent = s.contains('silent');
-      final isVibrate = s.contains('vibrate');
-
-      if (isSilent || isVibrate) {
+      final raw = await SoundMode.ringerModeStatus;
+      final s = raw.toString().toLowerCase();
+      if (s.contains('silent') || s.contains('vibrate')) {
         try {
           await SoundMode.setSoundMode(RingerModeStatus.normal);
         } on PlatformException {
           await sm_perm.PermissionHandler.openDoNotDisturbSetting();
         }
       }
-    } catch (_) {
-      // تجاهل
-    }
+    } catch (_) {}
   }
 
-// lib/notification/local_service.dart
-
+  /// تهيئة القناة + الليسنرز
   static Future<void> initNotifications({bool background = false}) async {
-    // 1) أنشئ القناة في initialize بدل setChannel(forceUpdate)
     await _awesome.initialize(
-      'resource://drawable/notification', // أي أيقونة صغيرة شفافة
+      'resource://drawable/notification', // أيقونة صغيرة (أبيض/شفاف)
       [
         NotificationChannel(
-          channelKey: alarmChannelKey, // مثال: 'charging_alarm_channel_v3'
+          channelKey: alarmChannelKey,
           channelName: 'Charging Alarm',
           channelDescription: 'Persistent alarm when device starts charging',
-          importance: NotificationImportance.Max,
+          importance: NotificationImportance.Max, // أعلى أولوية
           defaultColor: Colors.green,
           channelShowBadge: true,
           enableLights: true,
           ledColor: Colors.green,
           enableVibration: true,
-          vibrationPattern: Int64List.fromList([0, 1000, 500, 1200, 500, 1500]),
+          // نخلي القناة نفسها عندها صوت (مرة واحدة) كنسخة احتياطية
+          // وفي نفس الوقت هانشغّل لوب طويل بـ just_audio:
           playSound: true,
-          soundSource: 'resource://raw/alarm', // من res/raw/alarm.mp3
-          defaultRingtoneType: DefaultRingtoneType.Alarm,
-          locked: true,
+          soundSource:
+              'resource://raw/alarm', // android/app/src/main/res/raw/alarm.mp3
+          defaultRingtoneType:
+              DefaultRingtoneType.Alarm, // يتأثر من Alarm volume
+          locked: true, // إشعار لا يُسحب
           criticalAlerts: false,
+          vibrationPattern: Int64List.fromList([0, 900, 400, 1100, 400, 1300]),
         ),
       ],
       debug: false,
     );
-
-    // 2) اطلب الإذن (مش في الخلفية)
+print("Initialized notifications");
+    // إذن الإشعارات (Android 13+)
     if (!background && !await _awesome.isNotificationAllowed()) {
       await _awesome.requestPermissionToSendNotifications(
         permissions: const [
@@ -129,23 +135,21 @@ class LocalService {
     );
   }
 
-
-  /// افتح إعدادات إشعارات التطبيق/القناة (مفيد للدعم)
+  /// فتح إعدادات إشعارات التطبيق/القناة
   static Future<void> openChannelSettings() async {
     try {
-      await _awesome
-          .showNotificationConfigPage(); // يفتح صفحة إعدادات إشعارات التطبيق
+      await _awesome.showNotificationConfigPage();
     } catch (_) {}
   }
 
-  /// إشعار إنذار ثابت + زر إيقاف (صوت القناة يشتغل حتى لو التطبيق مقفول)
+  /// إشعار إنذار ثابت + زر إيقاف (صوت القناة “نبّهة” سريعة + اللوك)
   static Future<void> showPersistentAlarm() async {
     await _awesome.createNotification(
       content: NotificationContent(
         id: alarmNotificationId,
         channelKey: alarmChannelKey,
         title: '⚡ Power Restored',
-        body: 'Electricity is ON – Tap Stop to silence.',
+        body: 'Electricity is BACK — Tap Stop to silence.',
         category: NotificationCategory.Alarm,
         autoDismissible: false,
         locked: true,
@@ -153,25 +157,25 @@ class LocalService {
         fullScreenIntent: true,
         displayOnForeground: true,
         displayOnBackground: true,
-        notificationLayout: NotificationLayout.Default,
       ),
       actionButtons: [
         NotificationActionButton(
           key: 'STOP_ALARM',
           label: 'Stop',
-          actionType: ActionType.SilentAction, // بدون فتح التطبيق
-          color: Colors.red,
+          actionType: ActionType.SilentAction, // يتنفّذ في الخلفية
           autoDismissible: true,
+          color: Colors.red,
         ),
       ],
     );
+    print("Persistent alarm shown");
   }
 
-  /// رنّة طويلة تتكرر عبر just_audio (من الأصول)
+  /// تشغيل اللوب الطويل على “Alarm stream” ويرجع تلقائي بعد أي مقاطعة
   static Future<void> startRingingLoop() async {
     await _ensureAudible();
 
-    // Foreground service للإعلام عن تشغيل الصوت بالخلفية
+    // Foreground service: علشان أندرويد ما يوقفش الصوت في الخلفية
     await AndroidForegroundService.startAndroidForegroundService(
       content: NotificationContent(
         id: fgServiceNotiId,
@@ -196,26 +200,58 @@ class LocalService {
       foregroundServiceType: ForegroundServiceType.mediaPlayback,
     );
 
-    // اضبط الجلسة على Alarm usage
+    // جهّز الجلسة كمنبّه (Alarm) عشان يتأثّر من سلّم “منبّه” الجهاز
     final session = await AudioSession.instance;
     await session.configure(
       const AudioSessionConfiguration(
         androidAudioAttributes: AndroidAudioAttributes(
-          usage: AndroidAudioUsage.alarm,
-          contentType: AndroidAudioContentType.music,
+          usage: AndroidAudioUsage.alarm, // الأهم
+          contentType:
+              AndroidAudioContentType.sonification, // أفضل من music للمنبّهات
         ),
         androidWillPauseWhenDucked: false,
       ),
     );
+    await session.setActive(true);
 
-    // شغّل ملف صوتي من الأصول وكرّره (assets/sounds/alarm.mp3)
-    if (_player.playing) await _player.stop();
+    // مقاطعات النظام: نكمّل تلقائي بعد انتهاء المقاطعة
+    await _intSub?.cancel();
+    _intSub = session.interruptionEventStream.listen((event) async {
+      if (event.begin) {
+        if (event.type != AudioInterruptionType.duck) {
+          try {
+            await _player.pause();
+          } catch (_) {}
+        }
+      } else {
+        try {
+          await session.setActive(true);
+          if (!_player.playing) await _player.play();
+        } catch (_) {}
+      }
+    });
+
+    await _noisySub?.cancel();
+    _noisySub = session.becomingNoisyEventStream.listen((_) async {
+      try {
+        await session.setActive(true);
+        if (!_player.playing) await _player.play();
+      } catch (_) {}
+    });
+
+    // شغّل ملف الصوت من الأصول وكرّره
+    if (_player.playing) {
+      try {
+        await _player.stop();
+      } catch (_) {}
+    }
     await _player.setAsset('assets/sounds/alarm.mp3');
     await _player.setLoopMode(LoopMode.one);
-    await _player.setVolume(1.0);
+    await _player.setVolume(1.0); // يتأثّر من Alarm volume
     await _player.play();
   }
 
+  /// إيقاف اللوب + الخدمة الأمامية + تنظيف الليسنرز
   static Future<void> stopRingingLoop() async {
     try {
       await _player.stop();
@@ -223,11 +259,27 @@ class LocalService {
     try {
       await AndroidForegroundService.stopForeground(fgServiceNotiId);
     } catch (_) {}
+    try {
+      await _intSub?.cancel();
+    } catch (_) {}
+    try {
+      await _noisySub?.cancel();
+    } catch (_) {}
+    _intSub = null;
+    _noisySub = null;
   }
 
+  /// إلغاء إشعار المنبّه
   static Future<void> cancelAlarm() async {
-    await _awesome.cancel(alarmNotificationId);
+    try {
+      await _awesome.cancel(alarmNotificationId);
+    } catch (_) {}
   }
 
-  static Future<void> cancelAll() async => _awesome.cancelAll();
+  /// إلغاء كل إشعارات Awesome
+  static Future<void> cancelAll() async {
+    try {
+      await _awesome.cancelAll();
+    } catch (_) {}
+  }
 }
