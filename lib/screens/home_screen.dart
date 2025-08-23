@@ -7,6 +7,7 @@ import 'package:lottie/lottie.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voltify/background%20service/work_manager.dart';
 import 'package:voltify/notification/local_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -35,7 +36,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     requestPermissions(); // يبدأ الفلو
-    _initialize();
+    Future.wait([
+      WorkManager.init(),
+      LocalService.initNotifications(),
+      _initialize(),
+    ]);
   }
 
   Future<void> _initialize() async {
