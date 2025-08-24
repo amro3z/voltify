@@ -5,7 +5,6 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:voltify/background service/work_manager.dart';
 import 'package:voltify/notification/local_service.dart';
 import 'package:voltify/widget/home_body.dart';
 
@@ -39,11 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     requestPermissions();
 
     // تهيئة الخدمات + البيانات
-    Future.wait([
-      WorkManager.init(),
-      LocalService.initNotifications(),
-      _initialize(),
-    ]);
+      _initialize();
   }
 
   Future<void> _initialize() async {

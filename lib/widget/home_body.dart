@@ -156,7 +156,7 @@ class HomeBody extends StatelessWidget {
                         appIsRunning ? 'Stop' : 'Start',
                         style: const TextStyle(
                           fontSize: 20,
-                          color: Colors.black,
+                          color: Colors.red,
                           fontFamily: 'CustomFont',
                         ),
                       ),

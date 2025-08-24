@@ -11,9 +11,11 @@ import 'package:voltify/screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Future.wait([
+    WorkManager.init(),
+    LocalService.initNotifications(),
+  ]);
   tz.initializeTimeZones();
-
-  // متستناش تهيئات تقيلة هنا؛ اعرض UI بسرعة
   runApp(const Init());
 }
 

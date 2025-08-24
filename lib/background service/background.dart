@@ -21,13 +21,11 @@ void callbackDispatcher() {
       if (task == _task && appIsRunning) {
         print('app is running: ${appIsRunning.toString()}');
 
-        // إشعار + محاولة تشغيل رنّة طويلة
         await LocalService.showPersistentAlarm();
         try {
           await LocalService.startRingingLoop();
         } catch (_) {}
 
-        // إعادة تسجيل التاسك للشحن القادم
         await Workmanager().registerOneOffTask(
           _unique,
           _task,
